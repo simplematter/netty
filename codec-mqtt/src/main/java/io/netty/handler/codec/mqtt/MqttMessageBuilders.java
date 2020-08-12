@@ -30,6 +30,7 @@ public final class MqttMessageBuilders {
         private MqttQoS qos;
         private ByteBuf payload;
         private int messageId;
+        private MqttProperties mqttProperties;
 
         PublishBuilder() {
         }
@@ -59,9 +60,14 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public PublishBuilder properties(MqttProperties properties) {
+            this.mqttProperties = properties;
+            return this;
+        }
+
         public MqttPublishMessage build() {
             MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
-            MqttPublishVariableHeader mqttVariableHeader = new MqttPublishVariableHeader(topic, messageId);
+            MqttPublishVariableHeader mqttVariableHeader = new MqttPublishVariableHeader(topic, messageId, mqttProperties);
             return new MqttPublishMessage(mqttFixedHeader, mqttVariableHeader, Unpooled.buffer().writeBytes(payload));
         }
     }
@@ -183,7 +189,9 @@ public final class MqttMessageBuilders {
                             willQos.value(),
                             willFlag,
                             cleanSession,
-                            keepAliveSecs);
+                            keepAliveSecs,
+                            MqttProperties.NO_PROPERTIES);
+            //TODO parse properties when they are present
             MqttConnectPayload mqttConnectPayload =
                     new MqttConnectPayload(clientId, willTopic, willMessage, username, password);
             return new MqttConnectMessage(mqttFixedHeader, mqttConnectVariableHeader, mqttConnectPayload);

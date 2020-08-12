@@ -19,46 +19,33 @@ package io.netty.handler.codec.mqtt;
 import io.netty.util.internal.StringUtil;
 
 /**
- * Variable Header of the {@link MqttPublishMessage}
+ * Variable Header for the {@link MqttDisconnectMessage}
  */
-public final class MqttPublishVariableHeader {
+public final class MqttReasonCodeAndPropertiesVariableHeader {
 
-    private final String topicName;
-    private final int packetId;
-    private final MqttProperties mqttProperties;
+    private final short reasonCode;
+    private final MqttProperties properties;
 
-    public MqttPublishVariableHeader(String topicName, int packetId, MqttProperties mqttProperties) {
-        this.topicName = topicName;
-        this.packetId = packetId;
-        this.mqttProperties = mqttProperties;
+    public MqttReasonCodeAndPropertiesVariableHeader(short reasonCode,
+                                                     MqttProperties properties) {
+        this.reasonCode = reasonCode;
+        this.properties = properties;
     }
 
-    public String topicName() {
-        return topicName;
-    }
-
-    /**
-     * @deprecated Use {@link #packetId()} instead.
-     */
-    @Deprecated
-    public int messageId() {
-        return packetId;
-    }
-
-    public int packetId() {
-        return packetId;
+    public short reasonCode() {
+        return reasonCode;
     }
 
     public MqttProperties properties() {
-        return mqttProperties;
+        return properties;
     }
 
     @Override
     public String toString() {
         return new StringBuilder(StringUtil.simpleClassName(this))
             .append('[')
-            .append("topicName=").append(topicName)
-            .append(", packetId=").append(packetId)
+            .append("reasonCode=").append(reasonCode)
+            .append(", properties=").append(properties)
             .append(']')
             .toString();
     }
