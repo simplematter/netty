@@ -50,7 +50,8 @@ public final class MqttMessageFactory {
             case UNSUBACK:
                 return new MqttUnsubAckMessage(
                         mqttFixedHeader,
-                        (MqttMessageIdVariableHeader) variableHeader);
+                        (MqttMessageIdVariableHeader) variableHeader,
+                        (MqttUnsubAckPayload) payload);
 
             case UNSUBSCRIBE:
                 return new MqttUnsubscribeMessage(

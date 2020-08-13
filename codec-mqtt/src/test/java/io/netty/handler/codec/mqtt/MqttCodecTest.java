@@ -279,6 +279,7 @@ public class MqttCodecTest {
         testMessageWithOnlyFixedHeader(MqttMessage.DISCONNECT);
     }
 
+    //All 0..F message type codes are valid in MQTT 5
     @Test
     public void testUnknownMessageType() throws Exception {
 
@@ -295,8 +296,8 @@ public class MqttCodecTest {
             final MqttMessage decodedMessage = (MqttMessage) out.get(0);
             assertTrue(decodedMessage.decoderResult().isFailure());
             Throwable cause = decodedMessage.decoderResult().cause();
-            assertTrue(cause instanceof IllegalArgumentException);
-            assertEquals("unknown message type: 15", cause.getMessage());
+            assertTrue(cause instanceof DecoderException);
+            assertEquals("AUTH message requires at least MQTT 5", cause.getMessage());
         } finally {
             byteBuf.release();
         }

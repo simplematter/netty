@@ -51,7 +51,7 @@ final class MqttCodecUtil {
         throw new IllegalArgumentException(mqttVersion + " is unknown mqtt version");
     }
 
-    static MqttFixedHeader validateFixedHeader(MqttFixedHeader mqttFixedHeader) {
+    static MqttFixedHeader validateFixedHeader(MqttFixedHeader mqttFixedHeader, MqttVersion mqttVersion) {
         switch (mqttFixedHeader.messageType()) {
             case PUBREL:
             case SUBSCRIBE:
@@ -59,6 +59,12 @@ final class MqttCodecUtil {
                 if (mqttFixedHeader.qosLevel() != MqttQoS.AT_LEAST_ONCE) {
                     throw new DecoderException(mqttFixedHeader.messageType().name() + " message must have QoS 1");
                 }
+                return mqttFixedHeader;
+            case AUTH:
+                if(mqttVersion != MqttVersion.MQTT_5) {
+                    throw new DecoderException("AUTH message requires at least MQTT 5");
+                }
+                return mqttFixedHeader;
             default:
                 return mqttFixedHeader;
         }
