@@ -20,6 +20,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class MqttMessageBuilders {
@@ -80,6 +81,7 @@ public final class MqttMessageBuilders {
         private boolean hasUser;
         private boolean hasPassword;
         private int keepAliveSecs;
+        private MqttProperties willProperties;
         private boolean willFlag;
         private boolean willRetain;
         private MqttQoS willQos = MqttQoS.AT_MOST_ONCE;
@@ -87,6 +89,7 @@ public final class MqttMessageBuilders {
         private byte[] willMessage;
         private String username;
         private byte[] password;
+        private MqttProperties properties;
 
         ConnectBuilder() {
         }
@@ -145,6 +148,12 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public ConnectBuilder willProperties(MqttProperties willProperties) {
+            this.willProperties = willProperties;
+            return this;
+        }
+
+
         public ConnectBuilder hasUser(boolean value) {
             this.hasUser = value;
             return this;
@@ -176,6 +185,11 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public ConnectBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
         public MqttConnectMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.CONNECT, false, MqttQoS.AT_MOST_ONCE, false, 0);
@@ -190,10 +204,9 @@ public final class MqttMessageBuilders {
                             willFlag,
                             cleanSession,
                             keepAliveSecs,
-                            MqttProperties.NO_PROPERTIES);
-            //TODO parse properties when they are present
+                            properties);
             MqttConnectPayload mqttConnectPayload =
-                    new MqttConnectPayload(clientId, willTopic, willMessage, username, password);
+                    new MqttConnectPayload(clientId, willProperties, willTopic, willMessage, username, password);
             return new MqttConnectMessage(mqttFixedHeader, mqttConnectVariableHeader, mqttConnectPayload);
         }
     }
@@ -285,6 +298,182 @@ public final class MqttMessageBuilders {
         }
     }
 
+    public static final class PubAckBuilder {
+
+        private short packetId;
+        private byte reasonCode;
+        private MqttProperties properties;
+
+        PubAckBuilder() {
+        }
+
+        public PubAckBuilder reasonCode(byte reasonCode) {
+            this.reasonCode = reasonCode;
+            return this;
+        }
+
+        public PubAckBuilder packetId(short packetId) {
+            this.packetId = packetId;
+            return this;
+        }
+
+        public PubAckBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public MqttMessage build() {
+            MqttFixedHeader mqttFixedHeader =
+                    new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
+            MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader =
+                    new MqttPubReplyMessageVariableHeader(packetId, reasonCode, properties);
+            return new MqttMessage(mqttFixedHeader, mqttPubAckVariableHeader);
+        }
+    }
+
+    public static final class SubAckBuilder {
+
+        private short packetId;
+        private MqttProperties properties;
+        private final List<MqttQoS> grantedQoses = new ArrayList<MqttQoS>();
+
+        SubAckBuilder() {
+        }
+
+        public SubAckBuilder packetId(short packetId) {
+            this.packetId = packetId;
+            return this;
+        }
+
+        public SubAckBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public SubAckBuilder addGrantedQos(MqttQoS qos) {
+            this.grantedQoses.add(qos);
+            return this;
+        }
+
+        public SubAckBuilder addGrantedQoses(MqttQoS... qoses) {
+            this.grantedQoses.addAll(Arrays.asList(qoses));
+            return this;
+        }
+
+        public MqttSubAckMessage build() {
+            MqttFixedHeader mqttFixedHeader =
+                    new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
+            MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
+                    new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+
+            //transform to primitive types
+            int[] grantedQoses = new int[this.grantedQoses.size()];
+            int i = 0;
+            for (MqttQoS grantedQos : this.grantedQoses) {
+                grantedQoses[i++] = grantedQos.value();
+            }
+
+            MqttSubAckPayload subAckPayload = new MqttSubAckPayload(grantedQoses);
+            return new MqttSubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
+        }
+    }
+
+    public static final class UnsubAckBuilder {
+
+        private short packetId;
+        private MqttProperties properties;
+        private final List<Short> reasonCodes = new ArrayList<Short>();
+
+        UnsubAckBuilder() {
+        }
+
+        public UnsubAckBuilder packetId(short packetId) {
+            this.packetId = packetId;
+            return this;
+        }
+
+        public UnsubAckBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public UnsubAckBuilder addReasonCode(short reasonCode) {
+            this.reasonCodes.add(reasonCode);
+            return this;
+        }
+
+        public UnsubAckBuilder addReasonCodes(Short... reasonCodes) {
+            this.reasonCodes.addAll(Arrays.asList(reasonCodes));
+            return this;
+        }
+
+        public MqttUnsubAckMessage build() {
+            MqttFixedHeader mqttFixedHeader =
+                    new MqttFixedHeader(MqttMessageType.UNSUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
+            MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
+                    new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+
+            MqttUnsubAckPayload subAckPayload = new MqttUnsubAckPayload(reasonCodes);
+            return new MqttUnsubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
+        }
+    }
+
+    public static final class DisconnectBuilder {
+
+        private MqttProperties properties;
+        private short reasonCode;
+
+        DisconnectBuilder() {
+        }
+
+        public DisconnectBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public DisconnectBuilder reasonCode(short reasonCode) {
+            this.reasonCode = reasonCode;
+            return this;
+        }
+
+        public MqttDisconnectMessage build() {
+            MqttFixedHeader mqttFixedHeader =
+                    new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.AT_MOST_ONCE, false, 0);
+            MqttReasonCodeAndPropertiesVariableHeader mqttDisconnectVariableHeader =
+                    new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
+
+            return new MqttDisconnectMessage(mqttFixedHeader, mqttDisconnectVariableHeader);
+        }
+    }
+
+    public static final class AuthBuilder {
+
+        private MqttProperties properties;
+        private short reasonCode;
+
+        AuthBuilder() {
+        }
+
+        public AuthBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public AuthBuilder reasonCode(short reasonCode) {
+            this.reasonCode = reasonCode;
+            return this;
+        }
+
+        public MqttAuthMessage build() {
+            MqttFixedHeader mqttFixedHeader =
+                    new MqttFixedHeader(MqttMessageType.AUTH, false, MqttQoS.AT_MOST_ONCE, false, 0);
+            MqttReasonCodeAndPropertiesVariableHeader mqttAuthVariableHeader =
+                    new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
+
+            return new MqttAuthMessage(mqttFixedHeader, mqttAuthVariableHeader);
+        }
+    }
+
     public static ConnectBuilder connect() {
         return new ConnectBuilder();
     }
@@ -303,6 +492,26 @@ public final class MqttMessageBuilders {
 
     public static UnsubscribeBuilder unsubscribe() {
         return new UnsubscribeBuilder();
+    }
+
+    public static PubAckBuilder pubAck() {
+        return new PubAckBuilder();
+    }
+
+    public static SubAckBuilder subAck() {
+        return new SubAckBuilder();
+    }
+
+    public static UnsubAckBuilder unsubAck() {
+        return new UnsubAckBuilder();
+    }
+
+    public static DisconnectBuilder disconnect() {
+        return new DisconnectBuilder();
+    }
+
+    public static AuthBuilder auth() {
+        return new AuthBuilder();
     }
 
     private MqttMessageBuilders() {

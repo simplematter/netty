@@ -27,13 +27,14 @@ import io.netty.util.internal.StringUtil;
 public final class MqttConnectPayload {
 
     private final String clientIdentifier;
+    private MqttProperties willProperties;
     private final String willTopic;
     private final byte[] willMessage;
     private final String userName;
     private final byte[] password;
 
     /**
-     * @deprecated use {@link MqttConnectPayload#MqttConnectPayload(String, String, byte[], String, byte[])} instead
+     * @deprecated use {@link MqttConnectPayload#MqttConnectPayload(String, MqttProperties, String, byte[], String, byte[])} instead
      */
     @Deprecated
     public MqttConnectPayload(
@@ -44,6 +45,7 @@ public final class MqttConnectPayload {
             String password) {
         this(
           clientIdentifier,
+          MqttProperties.NO_PROPERTIES,
           willTopic,
           willMessage.getBytes(CharsetUtil.UTF_8),
           userName,
@@ -52,11 +54,13 @@ public final class MqttConnectPayload {
 
     public MqttConnectPayload(
             String clientIdentifier,
+            MqttProperties willProperties,
             String willTopic,
             byte[] willMessage,
             String userName,
             byte[] password) {
         this.clientIdentifier = clientIdentifier;
+        this.willProperties = willProperties;
         this.willTopic = willTopic;
         this.willMessage = willMessage;
         this.userName = userName;
@@ -65,6 +69,10 @@ public final class MqttConnectPayload {
 
     public String clientIdentifier() {
         return clientIdentifier;
+    }
+
+    public MqttProperties willProperties() {
+        return willProperties;
     }
 
     public String willTopic() {

@@ -33,7 +33,7 @@ public class MqttConnectPayloadTest {
         String userName = "userName";
         byte[] password = "password".getBytes(CharsetUtil.UTF_8);
         MqttConnectPayload mqttConnectPayload =
-            new MqttConnectPayload(clientIdentifier, willTopic, willMessage, userName, password);
+            new MqttConnectPayload(clientIdentifier, MqttProperties.NO_PROPERTIES, willTopic, willMessage, userName, password);
 
         assertNull(mqttConnectPayload.willMessageInBytes());
         assertNull(mqttConnectPayload.willMessage());
@@ -47,7 +47,7 @@ public class MqttConnectPayloadTest {
         String userName = "userName";
         byte[] password = null;
         MqttConnectPayload mqttConnectPayload =
-            new MqttConnectPayload(clientIdentifier, willTopic, willMessage, userName, password);
+            new MqttConnectPayload(clientIdentifier, MqttProperties.NO_PROPERTIES, willTopic, willMessage, userName, password);
 
         assertNull(mqttConnectPayload.passwordInBytes());
         assertNull(mqttConnectPayload.password());

@@ -74,8 +74,15 @@ public final class MqttMessageFactory {
 
             case PINGREQ:
             case PINGRESP:
-            case DISCONNECT:
                 return new MqttMessage(mqttFixedHeader);
+
+            case DISCONNECT:
+                return new MqttDisconnectMessage(mqttFixedHeader,
+                        (MqttReasonCodeAndPropertiesVariableHeader) variableHeader);
+
+            case AUTH:
+                return new MqttAuthMessage(mqttFixedHeader,
+                        (MqttReasonCodeAndPropertiesVariableHeader) variableHeader);
 
             default:
                 throw new IllegalArgumentException("unknown message type: " + mqttFixedHeader.messageType());

@@ -49,7 +49,7 @@ public class MqttHeartBeatClientHandler extends ChannelInboundHandlerAdapter {
         MqttConnectVariableHeader connectVariableHeader =
                 new MqttConnectVariableHeader(PROTOCOL_NAME_MQTT_3_1_1, PROTOCOL_VERSION_MQTT_3_1_1, true, true, false,
                                               0, false, false, 20, MqttProperties.NO_PROPERTIES);
-        MqttConnectPayload connectPayload = new MqttConnectPayload(clientId, null, null, userName, password);
+        MqttConnectPayload connectPayload = new MqttConnectPayload(clientId, MqttProperties.NO_PROPERTIES, null, null, userName, password);
         MqttConnectMessage connectMessage =
                 new MqttConnectMessage(connectFixedHeader, connectVariableHeader, connectPayload);
         ctx.writeAndFlush(connectMessage);

@@ -250,6 +250,15 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             }
         }
 
+        final MqttProperties properties;
+        if(mqttVersion == MqttVersion.MQTT_5) {
+            final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
+            properties = propertiesResult.value;
+            numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+        } else {
+            properties = MqttProperties.NO_PROPERTIES;
+        }
+
         final MqttConnectVariableHeader mqttConnectVariableHeader = new MqttConnectVariableHeader(
                 mqttVersion.protocolName(),
                 mqttVersion.protocolLevel(),
@@ -260,17 +269,26 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 willFlag,
                 cleanSession,
                 keepAlive.value,
-                MqttProperties.NO_PROPERTIES);
-        //TODO parse properties when they are available
+                properties);
         return new Result<MqttConnectVariableHeader>(mqttConnectVariableHeader, numberOfBytesConsumed);
     }
 
-    private static Result<MqttConnAckVariableHeader> decodeConnAckVariableHeader(ByteBuf buffer) {
+    private Result<MqttConnAckVariableHeader> decodeConnAckVariableHeader(ByteBuf buffer) {
         final boolean sessionPresent = (buffer.readUnsignedByte() & 0x01) == 0x01;
         byte returnCode = buffer.readByte();
-        final int numberOfBytesConsumed = 2;
+        int numberOfBytesConsumed = 2;
+
+        final MqttProperties properties;
+        if (mqttVersion == MqttVersion.MQTT_5) {
+            final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
+            properties = propertiesResult.value;
+            numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+        } else {
+            properties = MqttProperties.NO_PROPERTIES;
+        }
+
         final MqttConnAckVariableHeader mqttConnAckVariableHeader =
-                new MqttConnAckVariableHeader(MqttConnectReturnCode.valueOf(returnCode), sessionPresent);
+                new MqttConnAckVariableHeader(MqttConnectReturnCode.valueOf(returnCode), sessionPresent, properties);
         return new Result<MqttConnAckVariableHeader>(mqttConnAckVariableHeader, numberOfBytesConsumed);
     }
 
@@ -284,13 +302,21 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
     private Result<MqttMessageIdAndPropertiesVariableHeader> decodeMessageIdAndPropertiesVariableHeader(
             ByteBuf buffer) {
         final Result<Integer> packetId = decodeMessageId(buffer);
-        final Result<MqttProperties> properties =
-                (mqttVersion == MqttVersion.MQTT_5) ? decodeProperties(buffer) : new Result(MqttProperties.NO_PROPERTIES, 0);
-        final MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader =
-                new MqttMessageIdAndPropertiesVariableHeader(packetId.value, properties.value);
+
+        final MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader;
+        final int mqtt5Consumed;
+
+        if (mqttVersion == MqttVersion.MQTT_5) {
+            final Result<MqttProperties> properties = decodeProperties(buffer);
+            mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId.value, properties.value);
+            mqtt5Consumed = properties.numberOfBytesConsumed;
+        } else {
+            mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId.value, MqttProperties.NO_PROPERTIES);
+            mqtt5Consumed = 0;
+        }
 
         return new Result<MqttMessageIdAndPropertiesVariableHeader>(mqttVariableHeader,
-                packetId.numberOfBytesConsumed + properties.numberOfBytesConsumed);
+                packetId.numberOfBytesConsumed + mqtt5Consumed);
     }
 
     private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(ByteBuf buffer) {
@@ -336,7 +362,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 mqtt5Consumed);
     }
 
-    private static Result<MqttPublishVariableHeader> decodePublishVariableHeader(
+    private Result<MqttPublishVariableHeader> decodePublishVariableHeader(
             ByteBuf buffer,
             MqttFixedHeader mqttFixedHeader) {
         final Result<String> decodedTopic = decodeString(buffer);
@@ -351,9 +377,18 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             messageId = decodedMessageId.value;
             numberOfBytesConsumed += decodedMessageId.numberOfBytesConsumed;
         }
-        //TODO decode properties when they're available and MQTT version is 5
+
+        final MqttProperties properties;
+        if (mqttVersion == MqttVersion.MQTT_5) {
+            final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
+            properties = propertiesResult.value;
+            numberOfBytesConsumed = propertiesResult.numberOfBytesConsumed;
+        } else {
+            properties = MqttProperties.NO_PROPERTIES;
+        }
+
         final MqttPublishVariableHeader mqttPublishVariableHeader =
-                new MqttPublishVariableHeader(decodedTopic.value, messageId, MqttProperties.NO_PROPERTIES);
+                new MqttPublishVariableHeader(decodedTopic.value, messageId, properties);
         return new Result<MqttPublishVariableHeader>(mqttPublishVariableHeader, numberOfBytesConsumed);
     }
 
@@ -418,11 +453,22 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
 
         Result<String> decodedWillTopic = null;
         Result<byte[]> decodedWillMessage = null;
+
+        final MqttProperties willProperties;
         if (mqttConnectVariableHeader.isWillFlag()) {
+            if (mqttVersion == MqttVersion.MQTT_5) {
+                final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
+                willProperties = propertiesResult.value;
+                numberOfBytesConsumed = propertiesResult.numberOfBytesConsumed;
+            } else {
+                willProperties = MqttProperties.NO_PROPERTIES;
+            }
             decodedWillTopic = decodeString(buffer, 0, 32767);
             numberOfBytesConsumed += decodedWillTopic.numberOfBytesConsumed;
             decodedWillMessage = decodeByteArray(buffer);
             numberOfBytesConsumed += decodedWillMessage.numberOfBytesConsumed;
+        } else {
+            willProperties = MqttProperties.NO_PROPERTIES;
         }
         Result<String> decodedUserName = null;
         Result<byte[]> decodedPassword = null;
@@ -438,6 +484,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
         final MqttConnectPayload mqttConnectPayload =
                 new MqttConnectPayload(
                         decodedClientId.value,
+                        willProperties,
                         decodedWillTopic != null ? decodedWillTopic.value : null,
                         decodedWillMessage != null ? decodedWillMessage.value : null,
                         decodedUserName != null ? decodedUserName.value : null,
@@ -487,7 +534,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
 
     private Result<MqttUnsubAckPayload> decodeUnsubAckPayload(ByteBuf buffer,
                                                               int bytesRemainingInVariablePart) {
-        if(mqttVersion == MqttVersion.MQTT_5) {
+        if (mqttVersion == MqttVersion.MQTT_5) {
             final List<Short> reasonCodes = new ArrayList<Short>();
             int numberOfBytesConsumed = 0;
             while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
@@ -616,7 +663,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             Result<Integer> propertyId = decodeVariableByteInteger(buffer);
             numberOfBytesConsumed += propertyId.numberOfBytesConsumed;
 
-            //TODO use constants
+            //TODO use enum constants
             switch (propertyId.value) {
                 case 0x01: // Payload Format Indicator => Byte
                 case 0x17: // Request Problem Information
@@ -659,9 +706,11 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 case 0x1C: // Server Reference
                 case 0x1F: // Reason String
                 case 0x26: // User Property
-                    final Result<String> stringResult = decodeString(buffer);
-                    numberOfBytesConsumed += stringResult.numberOfBytesConsumed;
-                    decodedProperties.add(new MqttProperties.StringProperty(propertyId.value, stringResult.value));
+                    final Result<String> keyResult = decodeString(buffer);
+                    final Result<String> valueResult = decodeString(buffer);
+                    numberOfBytesConsumed += keyResult.numberOfBytesConsumed;
+                    numberOfBytesConsumed += valueResult.numberOfBytesConsumed;
+                    decodedProperties.add(new MqttProperties.StringPairProperty(propertyId.value, keyResult.value, valueResult.value));
                     break;
                 case 0x09: // Correlation Data => Binary Data
                 case 0x16: // Authentication Data
