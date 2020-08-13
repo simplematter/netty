@@ -49,4 +49,8 @@ public class MqttMessageIdVariableHeader {
             .append(']')
             .toString();
     }
+
+    public MqttMessageIdAndPropertiesVariableHeader withEmptyProperties() {
+        return new MqttMessageIdAndPropertiesVariableHeader(messageId, MqttProperties.NO_PROPERTIES);
+    }
 }

@@ -215,6 +215,7 @@ public final class MqttMessageBuilders {
 
         private List<MqttTopicSubscription> subscriptions;
         private int messageId;
+        private MqttProperties properties;
 
         SubscribeBuilder() {
         }
@@ -232,10 +233,16 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public SubscribeBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+
         public MqttSubscribeMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.SUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, false, 0);
-            MqttMessageIdVariableHeader mqttVariableHeader = MqttMessageIdVariableHeader.from(messageId);
+            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
             MqttSubscribePayload mqttSubscribePayload = new MqttSubscribePayload(subscriptions);
             return new MqttSubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
         }
@@ -245,6 +252,7 @@ public final class MqttMessageBuilders {
 
         private List<String> topicFilters;
         private int messageId;
+        private MqttProperties properties;
 
         UnsubscribeBuilder() {
         }
@@ -262,10 +270,16 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public UnsubscribeBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
+
         public MqttUnsubscribeMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.UNSUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, false, 0);
-            MqttMessageIdVariableHeader mqttVariableHeader = MqttMessageIdVariableHeader.from(messageId);
+            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
             MqttUnsubscribePayload mqttSubscribePayload = new MqttUnsubscribePayload(topicFilters);
             return new MqttUnsubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
         }

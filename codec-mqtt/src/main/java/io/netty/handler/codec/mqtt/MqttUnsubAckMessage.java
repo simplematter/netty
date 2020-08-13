@@ -22,14 +22,20 @@ package io.netty.handler.codec.mqtt;
 public final class MqttUnsubAckMessage extends MqttMessage {
 
     public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
-                               MqttMessageIdVariableHeader variableHeader,
+                               MqttMessageIdAndPropertiesVariableHeader variableHeader,
                                MqttUnsubAckPayload payload) {
         super(mqttFixedHeader, variableHeader, payload);
     }
 
+    public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
+                               MqttMessageIdVariableHeader variableHeader,
+                               MqttUnsubAckPayload payload) {
+        super(mqttFixedHeader, variableHeader.withEmptyProperties(), payload);
+    }
+
     @Override
-    public MqttMessageIdVariableHeader variableHeader() {
-        return (MqttMessageIdVariableHeader) super.variableHeader();
+    public MqttMessageIdAndPropertiesVariableHeader variableHeader() {
+        return (MqttMessageIdAndPropertiesVariableHeader) super.variableHeader();
     }
 
     @Override

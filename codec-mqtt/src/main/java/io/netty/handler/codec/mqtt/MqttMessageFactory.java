@@ -38,7 +38,7 @@ public final class MqttMessageFactory {
             case SUBSCRIBE:
                 return new MqttSubscribeMessage(
                         mqttFixedHeader,
-                        (MqttMessageIdVariableHeader) variableHeader,
+                        (MqttMessageIdAndPropertiesVariableHeader) variableHeader,
                         (MqttSubscribePayload) payload);
 
             case SUBACK:
@@ -56,7 +56,7 @@ public final class MqttMessageFactory {
             case UNSUBSCRIBE:
                 return new MqttUnsubscribeMessage(
                         mqttFixedHeader,
-                        (MqttMessageIdVariableHeader) variableHeader,
+                        (MqttMessageIdAndPropertiesVariableHeader) variableHeader,
                         (MqttUnsubscribePayload) payload);
 
             case PUBLISH:

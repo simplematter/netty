@@ -206,8 +206,6 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 return decodeConnAckVariableHeader(buffer);
 
             case UNSUBSCRIBE:
-                return decodeMessageIdVariableHeader(buffer);
-
             case SUBSCRIBE:
             case SUBACK:
             case UNSUBACK:
