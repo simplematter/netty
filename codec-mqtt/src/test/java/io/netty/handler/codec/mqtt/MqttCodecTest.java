@@ -22,6 +22,7 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
+import io.netty.handler.codec.EncoderException;
 import io.netty.util.CharsetUtil;
 import org.junit.Before;
 import org.junit.Test;
@@ -72,7 +73,7 @@ public class MqttCodecTest {
     @Test
     public void testConnectMessageForMqtt31() throws Exception {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -89,7 +90,7 @@ public class MqttCodecTest {
     @Test
     public void testConnectMessageForMqtt311() throws Exception {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -106,7 +107,7 @@ public class MqttCodecTest {
     @Test
     public void testConnectMessageWithNonZeroReservedFlagForMqtt311() throws Exception {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
         try {
             // Set the reserved flag in the CONNECT Packet to 1
             byteBuf.setByte(9, byteBuf.getByte(9) | 0x1);
@@ -130,16 +131,16 @@ public class MqttCodecTest {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1, null, PASSWORD);
 
         try {
-            ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+            ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
         } catch (Exception cause) {
-            assertTrue(cause instanceof DecoderException);
+            assertTrue(cause instanceof EncoderException);
         }
     }
 
     @Test
     public void testConnAckMessage() throws Exception {
         final MqttConnAckMessage message = createConnAckMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -154,7 +155,7 @@ public class MqttCodecTest {
     @Test
     public void testPublishMessage() throws Exception {
         final MqttPublishMessage message = createPublishMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -190,7 +191,7 @@ public class MqttCodecTest {
     @Test
     public void testSubscribeMessage() throws Exception {
         final MqttSubscribeMessage message = createSubscribeMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -206,7 +207,7 @@ public class MqttCodecTest {
     @Test
     public void testSubAckMessage() throws Exception {
         final MqttSubAckMessage message = createSubAckMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -228,7 +229,7 @@ public class MqttCodecTest {
         MqttSubAckMessage message =
                 new MqttSubAckMessage(mqttFixedHeader, mqttMessageIdVariableHeader, mqttSubAckPayload);
 
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -246,7 +247,7 @@ public class MqttCodecTest {
     @Test
     public void testUnSubscribeMessage() throws Exception {
         final MqttUnsubscribeMessage message = createUnsubscribeMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -284,7 +285,7 @@ public class MqttCodecTest {
     public void testUnknownMessageType() throws Exception {
 
         final MqttMessage message = createMessageWithFixedHeader(MqttMessageType.PINGREQ);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
         try {
             // setting an invalid message type (15, reserved and forbidden by MQTT 3.1.1 spec)
             byteBuf.setByte(0, 0xF0);
@@ -306,7 +307,7 @@ public class MqttCodecTest {
     @Test
     public void testConnectMessageForMqtt31TooLarge() throws Exception {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -328,7 +329,7 @@ public class MqttCodecTest {
     @Test
     public void testConnectMessageForMqtt311TooLarge() throws Exception {
         final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1);
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -350,7 +351,7 @@ public class MqttCodecTest {
     @Test
     public void testConnAckMessageTooLarge() throws Exception {
         final MqttConnAckMessage message = createConnAckMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -369,7 +370,7 @@ public class MqttCodecTest {
     @Test
     public void testPublishMessageTooLarge() throws Exception {
         final MqttPublishMessage message = createPublishMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -391,7 +392,7 @@ public class MqttCodecTest {
     @Test
     public void testSubscribeMessageTooLarge() throws Exception {
         final MqttSubscribeMessage message = createSubscribeMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -412,7 +413,7 @@ public class MqttCodecTest {
     @Test
     public void testSubAckMessageTooLarge() throws Exception {
         final MqttSubAckMessage message = createSubAckMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -433,7 +434,7 @@ public class MqttCodecTest {
     @Test
     public void testUnSubscribeMessageTooLarge() throws Exception {
         final MqttUnsubscribeMessage message = createUnsubscribeMessage();
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         try {
             final List<Object> out = new LinkedList<Object>();
@@ -452,7 +453,7 @@ public class MqttCodecTest {
     }
 
     private void testMessageWithOnlyFixedHeader(MqttMessage message) throws Exception {
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);
@@ -467,7 +468,7 @@ public class MqttCodecTest {
             throws Exception {
         MqttMessage message = createMessageWithFixedHeaderAndMessageIdVariableHeader(messageType);
 
-        ByteBuf byteBuf = MqttEncoder.doEncode(ALLOCATOR, message);
+        ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
         mqttDecoder.decode(ctx, byteBuf, out);

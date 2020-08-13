@@ -18,14 +18,17 @@ package io.netty.handler.codec.mqtt;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.EmptyByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
+import io.netty.handler.codec.EncoderException;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.EmptyArrays;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.netty.handler.codec.mqtt.MqttCodecUtil.*;
 
@@ -36,9 +39,37 @@ import static io.netty.handler.codec.mqtt.MqttCodecUtil.*;
 @ChannelHandler.Sharable
 public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
 
-    public static final MqttEncoder INSTANCE = new MqttEncoder();
+//    static class PacketSection {
+//        final int bufferSize;
+//        final ByteBuf byteBuf;
+//
+////        final PacketSection EMPTY = PacketSection(0, EmptyByteBuf());
+//
+//        PacketSection(int bufferSize, ByteBuf buf) {
+//            this.bufferSize = bufferSize;
+//            this.byteBuf = buf;
+//        }
+//
+//    }
 
-    private MqttEncoder() { }
+    public static final MqttEncoder INSTANCE = new MqttEncoder(null);
+
+    private AtomicReference<MqttVersion> mqttVersionRef = null;
+
+    private MqttVersion mqttVersion() {
+        if(mqttVersionRef == null)
+            return MqttVersion.MQTT_3_1_1;
+        else
+            return mqttVersionRef.get();
+    }
+
+    /**
+     *
+     * @param mqttVersionRef - version reference to be shared between encoder and decoder. If null - assumes MQTT 3
+     */
+    public MqttEncoder(AtomicReference<MqttVersion> mqttVersionRef) {
+        this.mqttVersionRef = mqttVersionRef;
+    }
 
     @Override
     protected void encode(ChannelHandlerContext ctx, MqttMessage msg, List<Object> out) throws Exception {
@@ -53,7 +84,7 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
      * @param message MQTT message to encode
      * @return ByteBuf with encoded bytes
      */
-    static ByteBuf doEncode(ByteBufAllocator byteBufAllocator, MqttMessage message) {
+    ByteBuf doEncode(ByteBufAllocator byteBufAllocator, MqttMessage message) {
 
         switch (message.fixedHeader().messageType()) {
             case CONNECT:
@@ -92,10 +123,13 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         }
     }
 
-    private static ByteBuf encodeConnectMessage(
+    private ByteBuf encodeConnectMessage(
             ByteBufAllocator byteBufAllocator,
             MqttConnectMessage message) {
         int payloadBufferSize = 0;
+
+        if(mqttVersionRef != null)
+            mqttVersionRef.set(MqttVersion.fromProtocolNameAndLevel(message.variableHeader().name(), (byte)message.variableHeader().version()));
 
         MqttFixedHeader mqttFixedHeader = message.fixedHeader();
         MqttConnectVariableHeader variableHeader = message.variableHeader();
@@ -105,7 +139,7 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
 
         // as MQTT 3.1 & 3.1.1 spec, If the User Name Flag is set to 0, the Password Flag MUST be set to 0
         if (!variableHeader.hasUserName() && variableHeader.hasPassword()) {
-            throw new DecoderException("Without a username, the password MUST be not set");
+            throw new EncoderException("Without a username, the password MUST be not set");
         }
 
         // Client id
@@ -138,10 +172,16 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
             payloadBufferSize += 2 + passwordBytes.length;
         }
 
-        // Fixed header
+        // Fixed and variable header
         byte[] protocolNameBytes = mqttVersion.protocolNameBytes();
         int variableHeaderBufferSize = 2 + protocolNameBytes.length + 4;
-        int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
+        ByteBuf propertiesBuf;
+        if(mqttVersion == MqttVersion.MQTT_5) {
+            propertiesBuf = encodeProperties(byteBufAllocator, variableHeader.properties());
+        } else {
+            propertiesBuf = new EmptyByteBuf(byteBufAllocator);
+        }
+        int variablePartSize = variableHeaderBufferSize + payloadBufferSize + propertiesBuf.readableBytes();
         int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
         ByteBuf buf = byteBufAllocator.buffer(fixedHeaderBufferSize + variablePartSize);
         buf.writeByte(getFixedHeaderByte1(mqttFixedHeader));
@@ -153,11 +193,20 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         buf.writeByte(variableHeader.version());
         buf.writeByte(getConnVariableHeaderFlag(variableHeader));
         buf.writeShort(variableHeader.keepAliveTimeSeconds());
+        buf.writeBytes(propertiesBuf);
 
-        // Payload
+
         buf.writeShort(clientIdentifierBytes.length);
         buf.writeBytes(clientIdentifierBytes, 0, clientIdentifierBytes.length);
         if (variableHeader.isWillFlag()) {
+            // Payload
+            ByteBuf willPropertiesBuf;
+            if(mqttVersion == MqttVersion.MQTT_5) {
+                willPropertiesBuf = encodeProperties(byteBufAllocator, payload.willProperties());
+            } else {
+                willPropertiesBuf = new EmptyByteBuf(byteBufAllocator);
+            }
+            buf.writeBytes(willPropertiesBuf);
             buf.writeShort(willTopicBytes.length);
             buf.writeBytes(willTopicBytes, 0, willTopicBytes.length);
             buf.writeShort(willMessageBytes.length);
@@ -358,6 +407,74 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         return buf;
     }
 
+    private static ByteBuf encodeProperties(ByteBufAllocator byteBufAllocator,
+                                                  MqttProperties mqttProperties) {
+        ByteBuf propertiesHeaderBuf = byteBufAllocator.buffer();
+        // encode also the Properties part
+        ByteBuf propertiesBuf = byteBufAllocator.buffer();
+        for (MqttProperties.MqttProperty property : mqttProperties.listAll()) {
+            writeVariableLengthInt(propertiesBuf, property.propertyId);
+            switch (MqttProperties.MqttPropertyType.valueOf(property.propertyId)) {
+                case PAYLOAD_FORMAT_INDICATOR:
+                case REQUEST_PROBLEM_INFORMATION:
+                case REQUEST_RESPONSE_INFORMATION:
+                case MAXIMUM_QOS:
+                case RETAIN_AVAILABLE:
+                case WILDCARD_SUBSCRIPTION_AVAILABLE:
+                case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
+                case SHARED_SUBSCRIPTION_AVAILABLE:
+                    final byte bytePropValue = ((MqttProperties.IntegerProperty) property).value.byteValue();
+                    propertiesBuf.writeByte(bytePropValue);
+                    break;
+                case SERVER_KEEP_ALIVE:
+                case RECEIVE_MAXIMUM:
+                case TOPIC_ALIAS_MAXIMUM:
+                case TOPIC_ALIAS:
+                    final short twoBytesInPropValue = ((MqttProperties.IntegerProperty) property).value.shortValue();
+                    propertiesBuf.writeShort(twoBytesInPropValue);
+                    break;
+                case PUBLICATION_EXPIRY_INTERVAL:
+                case SESSION_EXPIRY_INTERVAL:
+                case WILL_DELAY_INTERVAL:
+                case MAXIMUM_PACKET_SIZE:
+                    final int fourBytesIntPropValue = ((MqttProperties.IntegerProperty) property).value;
+                    propertiesBuf.writeInt(fourBytesIntPropValue);
+                    break;
+                case SUBSCRIPTION_IDENTIFIER:
+                    final int vbi = ((MqttProperties.IntegerProperty) property).value;
+                    writeVariableLengthInt(propertiesBuf, vbi);
+                    break;
+                case CONTENT_TYPE:
+                case RESPONSE_TOPIC:
+                case ASSIGNED_CLIENT_IDENTIFIER:
+                case AUTHENTICATION_METHOD:
+                case RESPONSE_INFORMATION:
+                case SERVER_REFERENCE:
+                case REASON_STRING:
+                case USER_PROPERTY:
+                    final String userPropKey = ((MqttProperties.StringPairProperty) property).key;
+                    final String userPropValue = ((MqttProperties.StringPairProperty) property).value;
+                    writeUTF8String(propertiesBuf, userPropKey);
+                    writeUTF8String(propertiesBuf, userPropValue);
+                    break;
+                case CORRELATION_DATA:
+                case AUTHENTICATION_DATA:
+                    final byte[] binaryPropValue = ((MqttProperties.BinaryProperty) property).value;
+                    propertiesBuf.writeShort(binaryPropValue.length);
+                    propertiesBuf.writeBytes(binaryPropValue, 0, binaryPropValue.length);
+                    break;
+            }
+            writeVariableLengthInt(propertiesHeaderBuf, propertiesBuf.readableBytes());
+            propertiesHeaderBuf.writeBytes(propertiesBuf);
+        }
+
+//        int propertiesHeaderSize = propertiesHeaderBuf.readableBytes();
+//        return new PacketSection(propertiesHeaderSize, propertiesHeaderBuf);
+        return propertiesHeaderBuf;
+    }
+
+
+
     private static int getFixedHeaderByte1(MqttFixedHeader header) {
         int ret = 0;
         ret |= header.messageType().value() << 4;
@@ -380,6 +497,12 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
             }
             buf.writeByte(digit);
         } while (num > 0);
+    }
+
+    static void writeUTF8String(ByteBuf buf, String s) {
+        byte[] sBytes = encodeStringUtf8(s);
+        buf.writeShort(sBytes.length);
+        buf.writeBytes(sBytes, 0, sBytes.length);
     }
 
     private static int getVariableLengthInt(int num) {
