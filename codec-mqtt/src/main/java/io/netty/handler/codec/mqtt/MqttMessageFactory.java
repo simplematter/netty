@@ -66,10 +66,10 @@ public final class MqttMessageFactory {
                         (ByteBuf) payload);
 
             case PUBACK:
-                return new MqttPubAckMessage(mqttFixedHeader, (MqttMessageIdVariableHeader) variableHeader);
             case PUBREC:
             case PUBREL:
             case PUBCOMP:
+                //Having MqttPubReplyMessageVariableHeader or MqttMessageIdVariableHeader
                 return new MqttMessage(mqttFixedHeader, variableHeader);
 
             case PINGREQ:
@@ -77,11 +77,9 @@ public final class MqttMessageFactory {
                 return new MqttMessage(mqttFixedHeader);
 
             case DISCONNECT:
-                return new MqttDisconnectMessage(mqttFixedHeader,
-                        (MqttReasonCodeAndPropertiesVariableHeader) variableHeader);
-
             case AUTH:
-                return new MqttAuthMessage(mqttFixedHeader,
+                //Having MqttReasonCodeAndPropertiesVariableHeader
+                return new MqttMessage(mqttFixedHeader,
                         (MqttReasonCodeAndPropertiesVariableHeader) variableHeader);
 
             default:

@@ -34,7 +34,8 @@ public final class MqttConnectPayload {
     private final byte[] password;
 
     /**
-     * @deprecated use {@link MqttConnectPayload#MqttConnectPayload(String, MqttProperties, String, byte[], String, byte[])} instead
+     * @deprecated use {@link MqttConnectPayload#MqttConnectPayload(String,
+     * MqttProperties, String, byte[], String, byte[])} instead
      */
     @Deprecated
     public MqttConnectPayload(

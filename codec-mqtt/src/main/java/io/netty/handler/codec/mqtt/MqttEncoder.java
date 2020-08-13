@@ -39,28 +39,16 @@ import static io.netty.handler.codec.mqtt.MqttCodecUtil.*;
 @ChannelHandler.Sharable
 public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
 
-//    static class PacketSection {
-//        final int bufferSize;
-//        final ByteBuf byteBuf;
-//
-////        final PacketSection EMPTY = PacketSection(0, EmptyByteBuf());
-//
-//        PacketSection(int bufferSize, ByteBuf buf) {
-//            this.bufferSize = bufferSize;
-//            this.byteBuf = buf;
-//        }
-//
-//    }
-
     public static final MqttEncoder INSTANCE = new MqttEncoder(null);
 
-    private AtomicReference<MqttVersion> mqttVersionRef = null;
+    private AtomicReference<MqttVersion> mqttVersionRef;
 
     private MqttVersion mqttVersion() {
-        if (mqttVersionRef == null)
+        if (mqttVersionRef == null) {
             return MqttVersion.MQTT_3_1_1;
-        else
+        } else {
             return mqttVersionRef.get();
+        }
     }
 
     /**
@@ -105,10 +93,11 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
                 return encodeSubAckMessage(byteBufAllocator, (MqttSubAckMessage) message);
 
             case UNSUBACK:
-                if (message instanceof MqttUnsubAckMessage)
+                if (message instanceof MqttUnsubAckMessage) {
                     return encodeUnsubAckMessage(byteBufAllocator, (MqttUnsubAckMessage) message);
-                else
+                } else {
                     return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(byteBufAllocator, message);
+                }
 
             case PUBACK:
             case PUBREC:
@@ -116,9 +105,12 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
             case PUBCOMP:
                 return encodePubReplyMessage(byteBufAllocator, message);
 
+            case DISCONNECT:
+            case AUTH:
+                return encodeReasonCodePlusPropertiesMessage(byteBufAllocator, message);
+
             case PINGREQ:
             case PINGRESP:
-            case DISCONNECT:
                 return encodeMessageWithOnlySingleByteFixedHeader(byteBufAllocator, message);
 
             default:
@@ -132,8 +124,10 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
             MqttConnectMessage message) {
         int payloadBufferSize = 0;
 
-        if (mqttVersionRef != null)
-            mqttVersionRef.set(MqttVersion.fromProtocolNameAndLevel(message.variableHeader().name(), (byte) message.variableHeader().version()));
+        if (mqttVersionRef != null) {
+            mqttVersionRef.set(MqttVersion.fromProtocolNameAndLevel(message.variableHeader().name(),
+                    (byte) message.variableHeader().version()));
+        }
 
         MqttFixedHeader mqttFixedHeader = message.fixedHeader();
         MqttConnectVariableHeader variableHeader = message.variableHeader();
@@ -193,7 +187,6 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         buf.writeByte(getConnVariableHeaderFlag(variableHeader));
         buf.writeShort(variableHeader.keepAliveTimeSeconds());
         buf.writeBytes(propertiesBuf);
-
 
         buf.writeShort(clientIdentifierBytes.length);
         buf.writeBytes(clientIdentifierBytes, 0, clientIdentifierBytes.length);
@@ -376,7 +369,6 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         return buf;
     }
 
-
     private ByteBuf encodePublishMessage(
             ByteBufAllocator byteBufAllocator,
             MqttPublishMessage message) {
@@ -409,26 +401,27 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         return buf;
     }
 
-
     private ByteBuf encodePubReplyMessage(ByteBufAllocator byteBufAllocator,
                                                  MqttMessage message) {
-        if(message.variableHeader() instanceof MqttPubReplyMessageVariableHeader) {
+        if (message.variableHeader() instanceof MqttPubReplyMessageVariableHeader) {
             MqttFixedHeader mqttFixedHeader = message.fixedHeader();
-            MqttPubReplyMessageVariableHeader variableHeader = (MqttPubReplyMessageVariableHeader) message.variableHeader();
+            MqttPubReplyMessageVariableHeader variableHeader =
+                    (MqttPubReplyMessageVariableHeader) message.variableHeader();
             int msgId = variableHeader.messageId();
 
             ByteBuf propertiesBuf = encodePropertiesIfNeeded(byteBufAllocator, variableHeader.properties());
 
             final int reasonLength = mqttVersion() == MqttVersion.MQTT_5 ? 1 : 0;
 
-            final int variableHeaderBufferSize = 2 + reasonLength + propertiesBuf.readableBytes(); // message id, reason (optional), properties
+            final int variableHeaderBufferSize = 2 + reasonLength + propertiesBuf.readableBytes();
             final int fixedHeaderBufferSize = 1 + getVariableLengthInt(variableHeaderBufferSize);
             ByteBuf buf = byteBufAllocator.buffer(fixedHeaderBufferSize + variableHeaderBufferSize);
             buf.writeByte(getFixedHeaderByte1(mqttFixedHeader));
             writeVariableLengthInt(buf, variableHeaderBufferSize);
             buf.writeShort(msgId);
-            if (mqttVersion() == MqttVersion.MQTT_5)
+            if (mqttVersion() == MqttVersion.MQTT_5) {
                 buf.writeByte(variableHeader.reasonCode());
+            }
             buf.writeBytes(propertiesBuf);
 
             return buf;
@@ -452,6 +445,33 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         buf.writeShort(msgId);
 
         return buf;
+    }
+
+    private ByteBuf encodeReasonCodePlusPropertiesMessage(ByteBufAllocator byteBufAllocator,
+                                          MqttMessage message) {
+        if (message.variableHeader() instanceof MqttReasonCodeAndPropertiesVariableHeader) {
+            MqttFixedHeader mqttFixedHeader = message.fixedHeader();
+            MqttReasonCodeAndPropertiesVariableHeader variableHeader =
+                    (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader();
+
+            ByteBuf propertiesBuf = encodePropertiesIfNeeded(byteBufAllocator, variableHeader.properties());
+
+            final int reasonLength = mqttVersion() == MqttVersion.MQTT_5 ? 1 : 0;
+
+            final int variableHeaderBufferSize = reasonLength + propertiesBuf.readableBytes();
+            final int fixedHeaderBufferSize = 1 + getVariableLengthInt(variableHeaderBufferSize);
+            ByteBuf buf = byteBufAllocator.buffer(fixedHeaderBufferSize + variableHeaderBufferSize);
+            buf.writeByte(getFixedHeaderByte1(mqttFixedHeader));
+            writeVariableLengthInt(buf, variableHeaderBufferSize);
+            if (mqttVersion() == MqttVersion.MQTT_5) {
+                buf.writeByte(variableHeader.reasonCode());
+            }
+            buf.writeBytes(propertiesBuf);
+
+            return buf;
+        } else {
+            return encodeMessageWithOnlySingleByteFixedHeader(byteBufAllocator, message);
+        }
     }
 
     private static ByteBuf encodeMessageWithOnlySingleByteFixedHeader(
@@ -535,11 +555,8 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
             propertiesHeaderBuf.writeBytes(propertiesBuf);
         }
 
-//        int propertiesHeaderSize = propertiesHeaderBuf.readableBytes();
-//        return new PacketSection(propertiesHeaderSize, propertiesHeaderBuf);
         return propertiesHeaderBuf;
     }
-
 
     private static int getFixedHeaderByte1(MqttFixedHeader header) {
         int ret = 0;

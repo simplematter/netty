@@ -40,7 +40,6 @@ public final class MqttConnAckVariableHeader {
         this.properties = properties;
     }
 
-
     public MqttConnectReturnCode connectReturnCode() {
         return connectReturnCode;
     }
@@ -49,7 +48,9 @@ public final class MqttConnAckVariableHeader {
         return sessionPresent;
     }
 
-    public MqttProperties properties() { return properties; }
+    public MqttProperties properties() {
+        return properties;
+    }
 
     @Override
     public String toString() {

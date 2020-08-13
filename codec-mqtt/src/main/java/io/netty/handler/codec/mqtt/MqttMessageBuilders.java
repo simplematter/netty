@@ -68,7 +68,8 @@ public final class MqttMessageBuilders {
 
         public MqttPublishMessage build() {
             MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
-            MqttPublishVariableHeader mqttVariableHeader = new MqttPublishVariableHeader(topic, messageId, mqttProperties);
+            MqttPublishVariableHeader mqttVariableHeader =
+                    new MqttPublishVariableHeader(topic, messageId, mqttProperties);
             return new MqttPublishMessage(mqttFixedHeader, mqttVariableHeader, Unpooled.buffer().writeBytes(payload));
         }
     }
@@ -152,7 +153,6 @@ public final class MqttMessageBuilders {
             this.willProperties = willProperties;
             return this;
         }
-
 
         public ConnectBuilder hasUser(boolean value) {
             this.hasUser = value;
@@ -238,11 +238,11 @@ public final class MqttMessageBuilders {
             return this;
         }
 
-
         public MqttSubscribeMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.SUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, false, 0);
-            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
+            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader =
+                    new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
             MqttSubscribePayload mqttSubscribePayload = new MqttSubscribePayload(subscriptions);
             return new MqttSubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
         }
@@ -275,11 +275,11 @@ public final class MqttMessageBuilders {
             return this;
         }
 
-
         public MqttUnsubscribeMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.UNSUBSCRIBE, false, MqttQoS.AT_LEAST_ONCE, false, 0);
-            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
+            MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader =
+                    new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
             MqttUnsubscribePayload mqttSubscribePayload = new MqttUnsubscribePayload(topicFilters);
             return new MqttUnsubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
         }
@@ -450,13 +450,13 @@ public final class MqttMessageBuilders {
             return this;
         }
 
-        public MqttDisconnectMessage build() {
+        public MqttMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.AT_MOST_ONCE, false, 0);
             MqttReasonCodeAndPropertiesVariableHeader mqttDisconnectVariableHeader =
                     new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
 
-            return new MqttDisconnectMessage(mqttFixedHeader, mqttDisconnectVariableHeader);
+            return new MqttMessage(mqttFixedHeader, mqttDisconnectVariableHeader);
         }
     }
 
@@ -478,13 +478,13 @@ public final class MqttMessageBuilders {
             return this;
         }
 
-        public MqttAuthMessage build() {
+        public MqttMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.AUTH, false, MqttQoS.AT_MOST_ONCE, false, 0);
             MqttReasonCodeAndPropertiesVariableHeader mqttAuthVariableHeader =
                     new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
 
-            return new MqttAuthMessage(mqttFixedHeader, mqttAuthVariableHeader);
+            return new MqttMessage(mqttFixedHeader, mqttAuthVariableHeader);
         }
     }
 

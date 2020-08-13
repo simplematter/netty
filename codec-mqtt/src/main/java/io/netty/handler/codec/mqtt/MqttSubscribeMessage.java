@@ -36,7 +36,6 @@ public final class MqttSubscribeMessage extends MqttMessage {
         this(mqttFixedHeader, variableHeader.withEmptyProperties(), payload);
     }
 
-
     @Override
     public MqttMessageIdAndPropertiesVariableHeader variableHeader() {
         return (MqttMessageIdAndPropertiesVariableHeader) super.variableHeader();

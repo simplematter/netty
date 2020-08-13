@@ -49,7 +49,6 @@ public final class MqttTopicSubscription {
         return option;
     }
 
-
     @Override
     public String toString() {
         return new StringBuilder(StringUtil.simpleClassName(this))

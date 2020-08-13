@@ -93,7 +93,9 @@ public final class MqttConnectVariableHeader {
         return keepAliveTimeSeconds;
     }
 
-    public MqttProperties properties() { return properties; }
+    public MqttProperties properties() {
+        return properties;
+    }
 
     @Override
     public String toString() {

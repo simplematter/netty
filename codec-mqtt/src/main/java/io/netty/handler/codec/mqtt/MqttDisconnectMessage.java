@@ -18,17 +18,17 @@ package io.netty.handler.codec.mqtt;
 /**
  * MQTT Disconnect message
  */
-public final class MqttDisconnectMessage extends MqttMessage {
-
-    public MqttDisconnectMessage(
-            MqttFixedHeader mqttFixedHeader,
-            MqttReasonCodeAndPropertiesVariableHeader variableHeader) {
-        super(mqttFixedHeader, variableHeader);
-    }
-
-    @Override
-    public MqttReasonCodeAndPropertiesVariableHeader variableHeader() {
-        return (MqttReasonCodeAndPropertiesVariableHeader) super.variableHeader();
-    }
-
-}
+//public final class MqttDisconnectMessage extends MqttMessage {
+//
+//    public MqttDisconnectMessage(
+//            MqttFixedHeader mqttFixedHeader,
+//            MqttReasonCodeAndPropertiesVariableHeader variableHeader) {
+//        super(mqttFixedHeader, variableHeader);
+//    }
+//
+//    @Override
+//    public MqttReasonCodeAndPropertiesVariableHeader variableHeader() {
+//        return (MqttReasonCodeAndPropertiesVariableHeader) super.variableHeader();
+//    }
+//
+//}

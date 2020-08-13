@@ -30,10 +30,11 @@ public final class MqttMessageIdAndPropertiesVariableHeader extends MqttMessageI
         if (messageId < 1 || messageId > 0xffff) {
             throw new IllegalArgumentException("messageId: " + messageId + " (expected: 1 ~ 65535)");
         }
-        if(properties == null)
+        if (properties == null) {
             this.properties = MqttProperties.NO_PROPERTIES;
-        else
+        } else {
             this.properties = properties;
+        }
     }
 
     public MqttProperties properties() {

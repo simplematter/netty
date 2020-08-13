@@ -61,7 +61,7 @@ final class MqttCodecUtil {
                 }
                 return mqttFixedHeader;
             case AUTH:
-                if(mqttVersion != MqttVersion.MQTT_5) {
+                if (mqttVersion != MqttVersion.MQTT_5) {
                     throw new DecoderException("AUTH message requires at least MQTT 5");
                 }
                 return mqttFixedHeader;

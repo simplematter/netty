@@ -18,17 +18,17 @@ package io.netty.handler.codec.mqtt;
 /**
  * MQTT Auth message
  */
-public final class MqttAuthMessage extends MqttMessage {
-
-    public MqttAuthMessage(
-            MqttFixedHeader mqttFixedHeader,
-            MqttReasonCodeAndPropertiesVariableHeader variableHeader) {
-        super(mqttFixedHeader, variableHeader);
-    }
-
-    @Override
-    public MqttReasonCodeAndPropertiesVariableHeader variableHeader() {
-        return (MqttReasonCodeAndPropertiesVariableHeader) super.variableHeader();
-    }
-
-}
+//public final class MqttAuthMessage extends MqttMessage {
+//
+//    public MqttAuthMessage(
+//            MqttFixedHeader mqttFixedHeader,
+//            MqttReasonCodeAndPropertiesVariableHeader variableHeader) {
+//        super(mqttFixedHeader, variableHeader);
+//    }
+//
+//    @Override
+//    public MqttReasonCodeAndPropertiesVariableHeader variableHeader() {
+//        return (MqttReasonCodeAndPropertiesVariableHeader) super.variableHeader();
+//    }
+//
+//}
