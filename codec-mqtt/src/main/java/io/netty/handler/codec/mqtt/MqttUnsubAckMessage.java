@@ -30,7 +30,16 @@ public final class MqttUnsubAckMessage extends MqttMessage {
     public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
                                MqttMessageIdVariableHeader variableHeader,
                                MqttUnsubAckPayload payload) {
-        super(mqttFixedHeader, variableHeader.withEmptyProperties(), payload);
+        this(mqttFixedHeader, fallbackVariableHeader(variableHeader), payload);
+    }
+
+    private static MqttMessageIdAndPropertiesVariableHeader fallbackVariableHeader(MqttMessageIdVariableHeader variableHeader) {
+        if(variableHeader instanceof MqttMessageIdAndPropertiesVariableHeader) {
+            return (MqttMessageIdAndPropertiesVariableHeader) variableHeader;
+        } else {
+            return new MqttMessageIdAndPropertiesVariableHeader(variableHeader.messageId(), MqttProperties.NO_PROPERTIES);
+        }
+
     }
 
     @Override

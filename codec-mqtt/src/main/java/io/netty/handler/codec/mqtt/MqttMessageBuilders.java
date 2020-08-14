@@ -221,12 +221,17 @@ public final class MqttMessageBuilders {
         }
 
         public SubscribeBuilder addSubscription(MqttQoS qos, String topic) {
-            if (subscriptions == null) {
-                subscriptions = new ArrayList<MqttTopicSubscription>(5);
-            }
+            ensureSubscriptionsExist();
             subscriptions.add(new MqttTopicSubscription(topic, qos));
             return this;
         }
+
+        public SubscribeBuilder addSubscription(String topic, MqttSubscriptionOption option) {
+            ensureSubscriptionsExist();
+            subscriptions.add(new MqttTopicSubscription(topic, option));
+            return this;
+        }
+
 
         public SubscribeBuilder messageId(int messageId) {
             this.messageId = messageId;
@@ -246,6 +251,13 @@ public final class MqttMessageBuilders {
             MqttSubscribePayload mqttSubscribePayload = new MqttSubscribePayload(subscriptions);
             return new MqttSubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
         }
+
+        private void ensureSubscriptionsExist() {
+            if (subscriptions == null) {
+                subscriptions = new ArrayList<MqttTopicSubscription>(5);
+            }
+        }
+
     }
 
     public static final class UnsubscribeBuilder {
@@ -289,6 +301,7 @@ public final class MqttMessageBuilders {
 
         private MqttConnectReturnCode returnCode;
         private boolean sessionPresent;
+        private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
         ConnAckBuilder() {
         }
@@ -303,11 +316,16 @@ public final class MqttMessageBuilders {
             return this;
         }
 
+        public ConnAckBuilder properties(MqttProperties properties) {
+            this.properties = properties;
+            return this;
+        }
+
         public MqttConnAckMessage build() {
             MqttFixedHeader mqttFixedHeader =
                     new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
             MqttConnAckVariableHeader mqttConnAckVariableHeader =
-                    new MqttConnAckVariableHeader(returnCode, sessionPresent);
+                    new MqttConnAckVariableHeader(returnCode, sessionPresent, properties);
             return new MqttConnAckMessage(mqttFixedHeader, mqttConnAckVariableHeader);
         }
     }

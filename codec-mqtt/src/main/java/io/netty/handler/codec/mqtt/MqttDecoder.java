@@ -79,6 +79,10 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
         this(maxBytesInMessage, null);
     }
 
+    public MqttDecoder(AtomicReference<MqttVersion> mqttVersionRef) {
+        this(DEFAULT_MAX_BYTES_IN_MESSAGE, mqttVersionRef);
+    }
+
     public MqttDecoder(int maxBytesInMessage, AtomicReference<MqttVersion> mqttVersionRef) {
         super(DecoderState.READ_FIXED_HEADER);
         this.maxBytesInMessage = maxBytesInMessage;
@@ -403,7 +407,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
         if (mqttVersion() == MqttVersion.MQTT_5) {
             final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
             properties = propertiesResult.value;
-            numberOfBytesConsumed = propertiesResult.numberOfBytesConsumed;
+            numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
         } else {
             properties = MqttProperties.NO_PROPERTIES;
         }
@@ -526,7 +530,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             MqttQoS qos = MqttQoS.valueOf(optionByte & 0x03);
             boolean noLocal = ((optionByte & 0x04) >> 2) == 1;
             boolean retainAsPublished = ((optionByte & 0x08) >> 3) == 1;
-            RetainedHandlingPolicy retainHandling = RetainedHandlingPolicy.valueOf(optionByte & 0x30 >> 4);
+            RetainedHandlingPolicy retainHandling = RetainedHandlingPolicy.valueOf((optionByte & 0x30) >> 4);
 
             final MqttSubscriptionOption subscriptionOption = new MqttSubscriptionOption(qos,
                     noLocal,

@@ -280,11 +280,20 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
 
         // Payload
         for (MqttTopicSubscription topic : payload.topicSubscriptions()) {
-            String topicName = topic.topicName();
-            byte[] topicNameBytes = encodeStringUtf8(topicName);
-            buf.writeShort(topicNameBytes.length);
-            buf.writeBytes(topicNameBytes, 0, topicNameBytes.length);
-            buf.writeByte(topic.qualityOfService().value());
+            writeUTF8String(buf, topic.topicName());
+            final MqttSubscriptionOption option = topic.option();
+
+            int optionEncoded = 0;
+            optionEncoded |= option.retainHandling().value() << 4;
+            if (option.isRetainAsPublished()) {
+                optionEncoded |= 0x08;
+            }
+            if (option.isNoLocal()) {
+                optionEncoded |= 0x04;
+            }
+            optionEncoded |= option.qos().value();
+
+            buf.writeByte(optionEncoded);
         }
 
         return buf;

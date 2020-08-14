@@ -35,9 +35,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL;
-import static io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType.WILL_DELAY_INTERVAL;
+import static io.netty.handler.codec.mqtt.MqttProperties.MqttPropertyType.*;
 import static io.netty.handler.codec.mqtt.MqttQoS.AT_LEAST_ONCE;
+import static io.netty.handler.codec.mqtt.MqttSubscriptionOption.RetainedHandlingPolicy.SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
@@ -65,6 +65,10 @@ public class MqttCodecTest {
     private final Channel channel = mock(Channel.class);
 
     private final MqttDecoder mqttDecoder = new MqttDecoder();
+
+    private final MqttDecoder mqtt5Decoder = new MqttDecoder(new AtomicReference(MqttVersion.MQTT_5));
+
+    private final MqttEncoder mqtt5Encoder = new MqttEncoder(new AtomicReference(MqttVersion.MQTT_5));
 
     /**
      * MqttDecoder with an unrealistic max payload size of 1 byte.
@@ -469,7 +473,7 @@ public class MqttCodecTest {
         ByteBuf byteBuf = new MqttEncoder(new AtomicReference<MqttVersion>()).doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
-        new MqttDecoder(DEFAULT_MAX_BYTES_IN_MESSAGE, new AtomicReference<MqttVersion>()).decode(ctx, byteBuf, out);
+        new MqttDecoder(new AtomicReference<MqttVersion>()).decode(ctx, byteBuf, out);
 
         assertEquals("Expected one object but got " + out.size(), 1, out.size());
 
@@ -481,6 +485,178 @@ public class MqttCodecTest {
     }
 
 
+    @Test
+    public void testConnAckMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(SESSION_EXPIRY_INTERVAL.value(), 10));
+        final MqttConnAckMessage message = createConnAckMessage(props);
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+
+        final MqttConnAckMessage decodedMessage = (MqttConnAckMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validateConnAckVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
+    }
+
+    @Test
+    public void testPublishMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        final MqttPublishMessage message = createPublishMessage(props);
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+
+        final MqttPublishMessage decodedMessage = (MqttPublishMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validatePublishVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
+        validatePublishPayload(message.payload(), decodedMessage.payload());
+    }
+
+    @Test
+    public void testPubAckMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        final MqttMessage message = createPubAckMessage((byte) 0x87, props);
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+
+        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validatePubReplyVariableHeader((MqttPubReplyMessageVariableHeader) message.variableHeader(),
+                (MqttPubReplyMessageVariableHeader) decodedMessage.variableHeader());
+    }
+
+    @Test
+    public void testSubAckMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        final MqttSubAckMessage message = createSubAckMessage(props);
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+
+        final MqttSubAckMessage decodedMessage = (MqttSubAckMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validatePacketIdAndPropertiesVariableHeader(
+                (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader(),
+                (MqttMessageIdAndPropertiesVariableHeader) decodedMessage.variableHeader());
+    }
+
+    @Test
+    public void testSubscribeMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        final MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
+                .messageId((short) 1)
+                .properties(props)
+                .addSubscription("/topic", new MqttSubscriptionOption(AT_LEAST_ONCE,
+                        true,
+                        true,
+                        SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS))
+                .build();
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+        final MqttSubscribeMessage decodedMessage = (MqttSubscribeMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        final MqttMessageIdAndPropertiesVariableHeader expectedHeader =
+                (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader();
+        final MqttMessageIdAndPropertiesVariableHeader actualHeader =
+                (MqttMessageIdAndPropertiesVariableHeader) decodedMessage.variableHeader();
+        validatePacketIdAndPropertiesVariableHeader(expectedHeader, actualHeader);
+        validateSubscribePayload(message.payload(), decodedMessage.payload());
+    }
+
+    @Test
+    public void testUnsubAckMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        final MqttUnsubAckMessage message = MqttMessageBuilders.unsubAck()
+                .packetId((short) 1)
+                .properties(props)
+                .addReasonCode((short) 0x83)
+                .build();
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+
+        final MqttUnsubAckMessage decodedMessage = (MqttUnsubAckMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validatePacketIdAndPropertiesVariableHeader(
+                (MqttMessageIdAndPropertiesVariableHeader) message.variableHeader(),
+                (MqttMessageIdAndPropertiesVariableHeader) decodedMessage.variableHeader());
+        assertEquals("Reason code list doesn't match", message.payload().unsubscribeReasonCodes(),
+                decodedMessage.payload().unsubscribeReasonCodes());
+    }
+
+    @Test
+    public void testDisconnectMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.IntegerProperty(SESSION_EXPIRY_INTERVAL.value(), 6));
+        final MqttMessage message = MqttMessageBuilders.disconnect()
+                .reasonCode((short) 0x96) // Message rate too high
+                .properties(props)
+                .build();
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validateReasonCodeAndPropertiesVariableHeader((MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
+                (MqttReasonCodeAndPropertiesVariableHeader) decodedMessage.variableHeader());
+    }
+
+    @Test
+    public void testAuthMessageForMqtt5() throws Exception {
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.BinaryProperty(AUTHENTICATION_DATA.value(), "secret".getBytes()));
+        final MqttMessage message = MqttMessageBuilders.auth()
+                .reasonCode((short) 0x18) // Continue authentication
+                .properties(props)
+                .build();
+        ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one object but got " + out.size(), 1, out.size());
+        final MqttMessage decodedMessage = (MqttMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validateReasonCodeAndPropertiesVariableHeader((MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
+                (MqttReasonCodeAndPropertiesVariableHeader) decodedMessage.variableHeader());
+    }
 
     private void testMessageWithOnlyFixedHeader(MqttMessage message) throws Exception {
         ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
@@ -562,18 +738,27 @@ public class MqttCodecTest {
     }
 
     private static MqttConnAckMessage createConnAckMessage() {
+        return createConnAckMessage(MqttProperties.NO_PROPERTIES);
+    }
+
+    private static MqttConnAckMessage createConnAckMessage(MqttProperties properties) {
         return MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
+                .properties(properties)
                 .sessionPresent(true)
                 .build();
     }
 
     private static MqttPublishMessage createPublishMessage() {
+        return createPublishMessage(MqttProperties.NO_PROPERTIES);
+    }
+
+    private static MqttPublishMessage createPublishMessage(MqttProperties properties) {
         MqttFixedHeader mqttFixedHeader =
                 new MqttFixedHeader(MqttMessageType.PUBLISH, false, MqttQoS.AT_LEAST_ONCE, true, 0);
         MqttPublishVariableHeader mqttPublishVariableHeader = new MqttPublishVariableHeader("/abc",
                 1234,
-                MqttProperties.NO_PROPERTIES);
+                properties);
         ByteBuf payload = ALLOCATOR.buffer();
         payload.writeBytes("whatever".getBytes(CharsetUtil.UTF_8));
         return new MqttPublishMessage(mqttFixedHeader, mqttPublishVariableHeader, payload);
@@ -594,6 +779,11 @@ public class MqttCodecTest {
     }
 
     private static MqttSubAckMessage createSubAckMessage() {
+        return createSubAckMessage(MqttProperties.NO_PROPERTIES);
+
+    }
+
+    private static MqttSubAckMessage createSubAckMessage(MqttProperties properties) {
         MqttFixedHeader mqttFixedHeader =
                 new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
         MqttMessageIdVariableHeader mqttMessageIdVariableHeader = MqttMessageIdVariableHeader.from(12345);
@@ -614,6 +804,15 @@ public class MqttCodecTest {
         MqttUnsubscribePayload mqttUnsubscribePayload = new MqttUnsubscribePayload(topics);
         return new MqttUnsubscribeMessage(mqttFixedHeader, mqttMessageIdVariableHeader, mqttUnsubscribePayload);
     }
+
+    private MqttMessage createPubAckMessage(byte reasonCode, MqttProperties properties) {
+        return MqttMessageBuilders.pubAck()
+                .packetId((short) 1)
+                .reasonCode(reasonCode)
+                .properties(properties)
+                .build();
+    }
+
 
     // Helper methods to compare expected and actual
     // MQTT messages
@@ -680,7 +879,8 @@ public class MqttCodecTest {
             MqttPublishVariableHeader expected,
             MqttPublishVariableHeader actual) {
         assertEquals("MqttPublishVariableHeader TopicName mismatch ", expected.topicName(), actual.topicName());
-        assertEquals("MqttPublishVariableHeader MessageId mismatch ", expected.messageId(), actual.messageId());
+        assertEquals("MqttPublishVariableHeader MessageId mismatch ", expected.packetId(), actual.packetId());
+        validateProperties(expected.properties(), actual.properties());
     }
 
     private static void validatePublishPayload(ByteBuf expected, ByteBuf actual) {
@@ -711,9 +911,9 @@ public class MqttCodecTest {
             MqttTopicSubscription actual) {
         assertEquals("MqttTopicSubscription TopicName mismatch ", expected.topicName(), actual.topicName());
         assertEquals(
-                "MqttTopicSubscription Qos mismatch ",
-                expected.qualityOfService(),
-                actual.qualityOfService());
+                "MqttTopicSubscription options mismatch ",
+                expected.option(),
+                actual.option());
     }
 
     private static void validateSubAckPayload(MqttSubAckPayload expected, MqttSubAckPayload actual) {
@@ -739,6 +939,38 @@ public class MqttCodecTest {
         assertTrue("MqttMessage DecoderResult cause reason expect to contain 'too large message' ",
                 cause.getMessage().contains("too large message:"));
     }
+
+    private static void validatePubReplyVariableHeader(
+            MqttPubReplyMessageVariableHeader expected,
+            MqttPubReplyMessageVariableHeader actual) {
+        assertEquals("MqttPubReplyMessageVariableHeader MessageId mismatch ",
+                expected.messageId(), actual.messageId());
+        assertEquals("MqttPubReplyMessageVariableHeader reasonCode mismatch ",
+                expected.reasonCode(), actual.reasonCode());
+
+        final MqttProperties expectedProps = expected.properties();
+        final MqttProperties actualProps = actual.properties();
+        validateProperties(expectedProps, actualProps);
+    }
+
+    private void validatePacketIdAndPropertiesVariableHeader(MqttMessageIdAndPropertiesVariableHeader expected,
+                                                              MqttMessageIdAndPropertiesVariableHeader actual) {
+        assertEquals("MqttMessageIdAndPropertiesVariableHeader MessageId mismatch ",
+                expected.messageId(), actual.messageId());
+        final MqttProperties expectedProps = expected.properties();
+        final MqttProperties actualProps = actual.properties();
+        validateProperties(expectedProps, actualProps);
+    }
+
+    private void validateReasonCodeAndPropertiesVariableHeader(MqttReasonCodeAndPropertiesVariableHeader expected,
+                                                             MqttReasonCodeAndPropertiesVariableHeader actual) {
+        assertEquals("MqttReasonCodeAndPropertiesVariableHeader reason mismatch ",
+                expected.reasonCode(), actual.reasonCode());
+        final MqttProperties expectedProps = expected.properties();
+        final MqttProperties actualProps = actual.properties();
+        validateProperties(expectedProps, actualProps);
+    }
+
 
     private static void validateProperties(MqttProperties expected, MqttProperties actual) {
         for (MqttProperties.MqttProperty expectedProperty : expected.listAll()) {
