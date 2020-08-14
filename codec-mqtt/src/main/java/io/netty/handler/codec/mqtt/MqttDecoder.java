@@ -688,61 +688,60 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             Result<Integer> propertyId = decodeVariableByteInteger(buffer);
             numberOfBytesConsumed += propertyId.numberOfBytesConsumed;
 
-            //TODO use enum constants
-            switch (propertyId.value) {
-                case 0x01: // Payload Format Indicator => Byte
-                case 0x17: // Request Problem Information
-                case 0x19: // Request Response Information
-                case 0x24: // Maximum QoS
-                case 0x25: // Retain Available
-                case 0x28: // Wildcard Subscription Available
-                case 0x29: // Subscription Identifier Available
-                case 0x2A: // Shared Subscription Available
+            switch (MqttProperties.MqttPropertyType.valueOf(propertyId.value)) {
+                case PAYLOAD_FORMAT_INDICATOR:
+                case REQUEST_PROBLEM_INFORMATION:
+                case REQUEST_RESPONSE_INFORMATION:
+                case MAXIMUM_QOS:
+                case RETAIN_AVAILABLE:
+                case WILDCARD_SUBSCRIPTION_AVAILABLE:
+                case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
+                case SHARED_SUBSCRIPTION_AVAILABLE:
                     final int b1 = buffer.readUnsignedByte();
                     numberOfBytesConsumed++;
                     decodedProperties.add(new MqttProperties.IntegerProperty(propertyId.value, b1));
                     break;
-                case 0x13: // Server Keep Alive => Two Byte Integer
-                case 0x21: // Receive Maximum
-                case 0x22: // Topic Alias Maximum
-                case 0x23: // Topic Alias
+                case SERVER_KEEP_ALIVE:
+                case RECEIVE_MAXIMUM:
+                case TOPIC_ALIAS_MAXIMUM:
+                case TOPIC_ALIAS:
                     final Result<Integer> int2BytesResult = decodeMsbLsb(buffer);
                     numberOfBytesConsumed += int2BytesResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.IntegerProperty(propertyId.value, int2BytesResult.value));
                     break;
-                case 0x02: // Publication Expiry Interval => Four Byte Integer
-                case 0x11: // Session Expiry Interval
-                case 0x18: // Will Delay Interval
-                case 0x27: // Maximum Packet Size
+                case PUBLICATION_EXPIRY_INTERVAL:
+                case SESSION_EXPIRY_INTERVAL:
+                case WILL_DELAY_INTERVAL:
+                case MAXIMUM_PACKET_SIZE:
                     final Result<Integer> int4BytesResult = decode4bytesInteger(buffer);
                     numberOfBytesConsumed += int4BytesResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.IntegerProperty(propertyId.value, int4BytesResult.value));
                     break;
-                case 0x0B: // Subscription Identifier => Variable Byte Integer
+                case SUBSCRIPTION_IDENTIFIER:
                     Result<Integer> vbIntegerResult = decodeVariableByteInteger(buffer);
                     numberOfBytesConsumed += vbIntegerResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.IntegerProperty(propertyId.value, vbIntegerResult.value));
                     break;
-                case 0x03: // Content Type => UTF-8 Encoded String
-                case 0x08: // Response Topic
-                case 0x12: // Assigned Client Identifier
-                case 0x15: // Authentication Method
-                case 0x1A: // Response Information
-                case 0x1C: // Server Reference
-                case 0x1F: // Reason String
+                case CONTENT_TYPE:
+                case RESPONSE_TOPIC:
+                case ASSIGNED_CLIENT_IDENTIFIER:
+                case AUTHENTICATION_METHOD:
+                case RESPONSE_INFORMATION:
+                case SERVER_REFERENCE:
+                case REASON_STRING:
                     final Result<String> stringResult = decodeString(buffer);
                     numberOfBytesConsumed += stringResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.StringProperty(propertyId.value, stringResult.value));
                     break;
-                case 0x26: // User Property
+                case USER_PROPERTY:
                     final Result<String> keyResult = decodeString(buffer);
                     final Result<String> valueResult = decodeString(buffer);
                     numberOfBytesConsumed += keyResult.numberOfBytesConsumed;
                     numberOfBytesConsumed += valueResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.UserProperty(keyResult.value, valueResult.value));
                     break;
-                case 0x09: // Correlation Data => Binary Data
-                case 0x16: // Authentication Data
+                case CORRELATION_DATA:
+                case AUTHENTICATION_DATA:
                     final Result<byte[]> binaryDataResult = decodeByteArray(buffer);
                     numberOfBytesConsumed += binaryDataResult.numberOfBytesConsumed;
                     decodedProperties.add(new MqttProperties.BinaryProperty(propertyId.value, binaryDataResult.value));
