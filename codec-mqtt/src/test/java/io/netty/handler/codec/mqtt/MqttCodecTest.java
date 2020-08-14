@@ -489,6 +489,8 @@ public class MqttCodecTest {
     public void testConnAckMessageForMqtt5() throws Exception {
         MqttProperties props = new MqttProperties();
         props.add(new MqttProperties.IntegerProperty(SESSION_EXPIRY_INTERVAL.value(), 10));
+        props.add(new MqttProperties.IntegerProperty(MAXIMUM_QOS.value(), 1));
+        props.add(new MqttProperties.IntegerProperty(MAXIMUM_PACKET_SIZE.value(), 1000));
         final MqttConnAckMessage message = createConnAckMessage(props);
         ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
 
@@ -656,6 +658,47 @@ public class MqttCodecTest {
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
         validateReasonCodeAndPropertiesVariableHeader((MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
                 (MqttReasonCodeAndPropertiesVariableHeader) decodedMessage.variableHeader());
+    }
+
+    @Test
+    public void testEncoderMqttVersionDetection() throws Exception {
+        final AtomicReference<MqttVersion> versionRef = new AtomicReference<MqttVersion>(null);
+
+        //Encode CONNECT message so that encoder would initialize its version
+        final MqttEncoder switchableEncoder = new MqttEncoder(versionRef);
+
+        final MqttConnectMessage connectMessage = createConnectMessage(MqttVersion.MQTT_5);
+        ByteBuf connectByteBuf = switchableEncoder.doEncode(ALLOCATOR, connectMessage);
+
+        assertEquals("Detected MQTT version mismatch", MqttVersion.MQTT_5, versionRef.get());
+
+        final List<Object> connectOut = new LinkedList<Object>();
+        mqtt5Decoder.decode(ctx, connectByteBuf, connectOut);
+
+        assertEquals("Expected one CONNECT object but got " + connectOut.size(), 1, connectOut.size());
+
+        final MqttConnectMessage decodedConnectMessage = (MqttConnectMessage) connectOut.get(0);
+
+        validateFixedHeaders(connectMessage.fixedHeader(), decodedConnectMessage.fixedHeader());
+        validateConnectVariableHeader(connectMessage.variableHeader(), decodedConnectMessage.variableHeader());
+        validateConnectPayload(connectMessage.payload(), decodedConnectMessage.payload());
+
+        //Send version-dependent message (PUBLISH), see if encoder has picked the right version
+        MqttProperties props = new MqttProperties();
+        props.add(new MqttProperties.StringPairProperty(USER_PROPERTY.value(), "priority", "urgent"));
+        final MqttPublishMessage message = createPublishMessage(props);
+        ByteBuf byteBuf = switchableEncoder.doEncode(ALLOCATOR, message);
+
+        final List<Object> out = new LinkedList<Object>();
+
+        mqtt5Decoder.decode(ctx, byteBuf, out);
+
+        assertEquals("Expected one PUBLISH object but got " + out.size(), 1, out.size());
+
+        final MqttPublishMessage decodedMessage = (MqttPublishMessage) out.get(0);
+        validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
+        validatePublishVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
+        validatePublishPayload(message.payload(), decodedMessage.payload());
     }
 
     private void testMessageWithOnlyFixedHeader(MqttMessage message) throws Exception {
