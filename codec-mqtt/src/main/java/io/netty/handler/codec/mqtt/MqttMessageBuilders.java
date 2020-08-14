@@ -82,7 +82,7 @@ public final class MqttMessageBuilders {
         private boolean hasUser;
         private boolean hasPassword;
         private int keepAliveSecs;
-        private MqttProperties willProperties;
+        private MqttProperties willProperties = MqttProperties.NO_PROPERTIES;
         private boolean willFlag;
         private boolean willRetain;
         private MqttQoS willQos = MqttQoS.AT_MOST_ONCE;
@@ -90,7 +90,7 @@ public final class MqttMessageBuilders {
         private byte[] willMessage;
         private String username;
         private byte[] password;
-        private MqttProperties properties;
+        private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
         ConnectBuilder() {
         }

@@ -49,8 +49,8 @@ public enum MqttVersion {
 
     public static MqttVersion fromProtocolNameAndLevel(String protocolName, byte protocolLevel) {
         for (MqttVersion mv : values()) {
-            if (mv.name.equals(protocolName)) {
-                if (mv.level == protocolLevel) {
+            if (mv.level == protocolLevel) {
+                if (mv.name.equals(protocolName)) {
                     return mv;
                 } else {
                     throw new MqttUnacceptableProtocolVersionException(protocolName + " and " +

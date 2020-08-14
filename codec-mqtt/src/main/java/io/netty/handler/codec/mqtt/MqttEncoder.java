@@ -174,6 +174,8 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         byte[] protocolNameBytes = mqttVersion.protocolNameBytes();
         int variableHeaderBufferSize = 2 + protocolNameBytes.length + 4;
         ByteBuf propertiesBuf = encodePropertiesIfNeeded(byteBufAllocator, message.variableHeader().properties());
+        ByteBuf willPropertiesBuf = encodePropertiesIfNeeded(byteBufAllocator, payload.willProperties());
+        payloadBufferSize += willPropertiesBuf.readableBytes();
         int variablePartSize = variableHeaderBufferSize + payloadBufferSize + propertiesBuf.readableBytes();
         int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
         ByteBuf buf = byteBufAllocator.buffer(fixedHeaderBufferSize + variablePartSize);
@@ -188,11 +190,10 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         buf.writeShort(variableHeader.keepAliveTimeSeconds());
         buf.writeBytes(propertiesBuf);
 
+        // Payload
         buf.writeShort(clientIdentifierBytes.length);
         buf.writeBytes(clientIdentifierBytes, 0, clientIdentifierBytes.length);
         if (variableHeader.isWillFlag()) {
-            // Payload
-            ByteBuf willPropertiesBuf = encodePropertiesIfNeeded(byteBufAllocator, payload.willProperties());
             buf.writeBytes(willPropertiesBuf);
             buf.writeShort(willTopicBytes.length);
             buf.writeBytes(willTopicBytes, 0, willTopicBytes.length);

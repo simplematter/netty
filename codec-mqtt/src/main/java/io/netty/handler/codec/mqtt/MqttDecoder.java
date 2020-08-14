@@ -256,7 +256,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
         final int willQos = (b1 & 0x18) >> 3;
         final boolean willFlag = (b1 & 0x04) == 0x04;
         final boolean cleanSession = (b1 & 0x02) == 0x02;
-        if (version == MqttVersion.MQTT_3_1_1) {
+        if (version == MqttVersion.MQTT_3_1_1 || version == MqttVersion.MQTT_5) {
             final boolean zeroReservedFlag = (b1 & 0x01) == 0x0;
             if (!zeroReservedFlag) {
                 // MQTT v3.1.1: The Server MUST validate that the reserved flag in the CONNECT Control Packet is
@@ -480,7 +480,7 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
             if (mqttVersion == MqttVersion.MQTT_5) {
                 final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
                 willProperties = propertiesResult.value;
-                numberOfBytesConsumed = propertiesResult.numberOfBytesConsumed;
+                numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
             } else {
                 willProperties = MqttProperties.NO_PROPERTIES;
             }
