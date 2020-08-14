@@ -510,7 +510,6 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
         // encode also the Properties part
         ByteBuf propertiesBuf = byteBufAllocator.buffer();
         for (MqttProperties.MqttProperty property : mqttProperties.listAll()) {
-            writeVariableLengthInt(propertiesBuf, property.propertyId);
             switch (MqttProperties.MqttPropertyType.valueOf(property.propertyId)) {
                 case PAYLOAD_FORMAT_INDICATOR:
                 case REQUEST_PROBLEM_INFORMATION:
@@ -520,6 +519,7 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
                 case WILDCARD_SUBSCRIPTION_AVAILABLE:
                 case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
                 case SHARED_SUBSCRIPTION_AVAILABLE:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
                     final byte bytePropValue = ((MqttProperties.IntegerProperty) property).value.byteValue();
                     propertiesBuf.writeByte(bytePropValue);
                     break;
@@ -527,6 +527,7 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
                 case RECEIVE_MAXIMUM:
                 case TOPIC_ALIAS_MAXIMUM:
                 case TOPIC_ALIAS:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
                     final short twoBytesInPropValue = ((MqttProperties.IntegerProperty) property).value.shortValue();
                     propertiesBuf.writeShort(twoBytesInPropValue);
                     break;
@@ -534,10 +535,12 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
                 case SESSION_EXPIRY_INTERVAL:
                 case WILL_DELAY_INTERVAL:
                 case MAXIMUM_PACKET_SIZE:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
                     final int fourBytesIntPropValue = ((MqttProperties.IntegerProperty) property).value;
                     propertiesBuf.writeInt(fourBytesIntPropValue);
                     break;
                 case SUBSCRIPTION_IDENTIFIER:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
                     final int vbi = ((MqttProperties.IntegerProperty) property).value;
                     writeVariableLengthInt(propertiesBuf, vbi);
                     break;
@@ -548,14 +551,20 @@ public final class MqttEncoder extends MessageToMessageEncoder<MqttMessage> {
                 case RESPONSE_INFORMATION:
                 case SERVER_REFERENCE:
                 case REASON_STRING:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
+                    writeUTF8String(propertiesBuf, ((MqttProperties.StringProperty) property).value);
+                    break;
                 case USER_PROPERTY:
-                    final String userPropKey = ((MqttProperties.StringPairProperty) property).key;
-                    final String userPropValue = ((MqttProperties.StringPairProperty) property).value;
-                    writeUTF8String(propertiesBuf, userPropKey);
-                    writeUTF8String(propertiesBuf, userPropValue);
+                    final List<MqttProperties.StringPair> pairs = ((MqttProperties.UserProperties) property).value;
+                    for (MqttProperties.StringPair pair: pairs) {
+                        writeVariableLengthInt(propertiesBuf, property.propertyId);
+                        writeUTF8String(propertiesBuf, pair.key);
+                        writeUTF8String(propertiesBuf, pair.value);
+                    }
                     break;
                 case CORRELATION_DATA:
                 case AUTHENTICATION_DATA:
+                    writeVariableLengthInt(propertiesBuf, property.propertyId);
                     final byte[] binaryPropValue = ((MqttProperties.BinaryProperty) property).value;
                     propertiesBuf.writeShort(binaryPropValue.length);
                     propertiesBuf.writeBytes(binaryPropValue, 0, binaryPropValue.length);

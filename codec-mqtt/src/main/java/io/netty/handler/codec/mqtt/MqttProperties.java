@@ -18,6 +18,8 @@ package io.netty.handler.codec.mqtt;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * MQTT Properties container
@@ -25,7 +27,6 @@ import java.util.Map;
 public class MqttProperties {
 
     public enum MqttPropertyType {
-
         // single byte properties
         PAYLOAD_FORMAT_INDICATOR(0x01),
         REQUEST_PROBLEM_INFORMATION(0x17),
@@ -111,12 +112,58 @@ public class MqttProperties {
         }
     }
 
-    public static final class StringPairProperty extends MqttProperty<String> {
-        final String key;
+    public static final class StringPair {
+        public final String key;
+        public final String value;
 
-        public StringPairProperty(int propertyId, String key, String value) {
-            super(propertyId, value);
+        public StringPair(String key, String value) {
             this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public int hashCode() {
+            return key.hashCode() + 31 * value.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            StringPair that = (StringPair) obj;
+
+            return that.key.equals(this.key) && that.value.equals(this.value);
+        }
+    }
+
+    //User properties are the only properties that may be included multiple times and
+    //are the only properties where ordering is required. Therefore, they need a special handling
+    public static final class UserProperties extends MqttProperty<List<StringPair>> {
+        public UserProperties() {
+            super(MqttPropertyType.USER_PROPERTY.value, new ArrayList<StringPair>());
+        }
+
+        public UserProperties(List<StringPair> values) {
+            this();
+            this.value.addAll(values);
+        }
+
+        public void add(StringPair pair) {
+            this.value.add(pair);
+        }
+
+        public void add(String key, String value) {
+            this.value.add(new StringPair(key, value));
+        }
+    }
+
+    public static final class UserProperty extends MqttProperty<StringPair> {
+        public UserProperty(String key, String value) {
+            super(MqttPropertyType.USER_PROPERTY.value, new StringPair(key, value));
         }
     }
 
@@ -130,10 +177,25 @@ public class MqttProperties {
     private final Map<Integer, MqttProperty> props = new HashMap<Integer, MqttProperty>();
 
     public void add(MqttProperty property) {
-        props.put(property.propertyId, property);
+        if (property.propertyId == MqttPropertyType.USER_PROPERTY.value) {
+            UserProperties userProps = (UserProperties) props.get(property.propertyId);
+            if (userProps == null) {
+                userProps = new UserProperties();
+                props.put(property.propertyId, userProps);
+            }
+            if (property instanceof UserProperty) {
+                userProps.add(((UserProperty) property).value);
+            } else {
+                for (StringPair pair: ((UserProperties) property).value) {
+                    userProps.add(pair);
+                }
+            }
+        } else {
+            props.put(property.propertyId, property);
+        }
     }
 
-    public Collection<MqttProperty> listAll() {
+    public Collection<? extends MqttProperty> listAll() {
         return props.values();
     }
 

@@ -139,7 +139,12 @@ public class MqttCodecTest {
 
     @Test
     public void testConnectMessageNoPassword() throws Exception {
-        final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_3_1_1, null, PASSWORD, MqttProperties.NO_PROPERTIES, MqttProperties.NO_PROPERTIES);
+        final MqttConnectMessage message = createConnectMessage(
+                MqttVersion.MQTT_3_1_1,
+                null,
+                PASSWORD,
+                MqttProperties.NO_PROPERTIES,
+                MqttProperties.NO_PROPERTIES);
 
         try {
             ByteBuf byteBuf = MqttEncoder.INSTANCE.doEncode(ALLOCATOR, message);
@@ -467,9 +472,11 @@ public class MqttCodecTest {
     public void testConnectMessageForMqtt5() throws Exception {
         MqttProperties props = new MqttProperties();
         props.add(new MqttProperties.IntegerProperty(SESSION_EXPIRY_INTERVAL.value(), 10));
+        props.add(new MqttProperties.StringProperty(AUTHENTICATION_METHOD.value(), "Plain"));
         MqttProperties willProps = new MqttProperties();
         willProps.add(new MqttProperties.IntegerProperty(WILL_DELAY_INTERVAL.value(), 100));
-        final MqttConnectMessage message = createConnectMessage(MqttVersion.MQTT_5, USER_NAME, PASSWORD, props, willProps);
+        final MqttConnectMessage message =
+                createConnectMessage(MqttVersion.MQTT_5, USER_NAME, PASSWORD, props, willProps);
         ByteBuf byteBuf = new MqttEncoder(new AtomicReference<MqttVersion>()).doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
@@ -483,7 +490,6 @@ public class MqttCodecTest {
         validateConnectVariableHeader(message.variableHeader(), decodedMessage.variableHeader());
         validateConnectPayload(message.payload(), decodedMessage.payload());
     }
-
 
     @Test
     public void testConnAckMessageForMqtt5() throws Exception {
@@ -509,6 +515,10 @@ public class MqttCodecTest {
     public void testPublishMessageForMqtt5() throws Exception {
         MqttProperties props = new MqttProperties();
         props.add(new MqttProperties.IntegerProperty(PAYLOAD_FORMAT_INDICATOR.value(), 6));
+        props.add(new MqttProperties.UserProperty("isSecret", "true"));
+        props.add(new MqttProperties.UserProperty("isUrgent", "false"));
+        assertEquals("User properties count mismatch",
+                ((MqttProperties.UserProperties) props.getProperty(USER_PROPERTY.value())).value.size(), 2);
         final MqttPublishMessage message = createPublishMessage(props);
         ByteBuf byteBuf = mqtt5Encoder.doEncode(ALLOCATOR, message);
 
@@ -635,7 +645,8 @@ public class MqttCodecTest {
         assertEquals("Expected one object but got " + out.size(), 1, out.size());
         final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
-        validateReasonCodeAndPropertiesVariableHeader((MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
+        validateReasonCodeAndPropertiesVariableHeader(
+                (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
                 (MqttReasonCodeAndPropertiesVariableHeader) decodedMessage.variableHeader());
     }
 
@@ -656,24 +667,29 @@ public class MqttCodecTest {
         assertEquals("Expected one object but got " + out.size(), 1, out.size());
         final MqttMessage decodedMessage = (MqttMessage) out.get(0);
         validateFixedHeaders(message.fixedHeader(), decodedMessage.fixedHeader());
-        validateReasonCodeAndPropertiesVariableHeader((MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
+        validateReasonCodeAndPropertiesVariableHeader(
+                (MqttReasonCodeAndPropertiesVariableHeader) message.variableHeader(),
                 (MqttReasonCodeAndPropertiesVariableHeader) decodedMessage.variableHeader());
     }
 
     @Test
-    public void testEncoderMqttVersionDetection() throws Exception {
-        final AtomicReference<MqttVersion> versionRef = new AtomicReference<MqttVersion>(null);
+    public void testMqttVersionDetection() throws Exception {
+        final AtomicReference<MqttVersion> clientVersionRef = new AtomicReference<MqttVersion>(null);
+        final AtomicReference<MqttVersion> serverVersionRef = new AtomicReference<MqttVersion>(null);
 
         //Encode CONNECT message so that encoder would initialize its version
-        final MqttEncoder switchableEncoder = new MqttEncoder(versionRef);
+        final MqttEncoder switchableEncoder = new MqttEncoder(clientVersionRef);
+        final MqttDecoder switchableDecoder = new MqttDecoder(serverVersionRef);
 
         final MqttConnectMessage connectMessage = createConnectMessage(MqttVersion.MQTT_5);
         ByteBuf connectByteBuf = switchableEncoder.doEncode(ALLOCATOR, connectMessage);
 
-        assertEquals("Detected MQTT version mismatch", MqttVersion.MQTT_5, versionRef.get());
+        assertEquals("Detected MQTT client version mismatch", MqttVersion.MQTT_5, clientVersionRef.get());
 
         final List<Object> connectOut = new LinkedList<Object>();
-        mqtt5Decoder.decode(ctx, connectByteBuf, connectOut);
+        switchableDecoder.decode(ctx, connectByteBuf, connectOut);
+
+        assertEquals("Detected MQTT server version mismatch", MqttVersion.MQTT_5, serverVersionRef.get());
 
         assertEquals("Expected one CONNECT object but got " + connectOut.size(), 1, connectOut.size());
 
@@ -685,13 +701,13 @@ public class MqttCodecTest {
 
         //Send version-dependent message (PUBLISH), see if encoder has picked the right version
         MqttProperties props = new MqttProperties();
-        props.add(new MqttProperties.StringPairProperty(USER_PROPERTY.value(), "priority", "urgent"));
+        props.add(new MqttProperties.UserProperty("priority", "urgent"));
         final MqttPublishMessage message = createPublishMessage(props);
         ByteBuf byteBuf = switchableEncoder.doEncode(ALLOCATOR, message);
 
         final List<Object> out = new LinkedList<Object>();
 
-        mqtt5Decoder.decode(ctx, byteBuf, out);
+        switchableDecoder.decode(ctx, byteBuf, out);
 
         assertEquals("Expected one PUBLISH object but got " + out.size(), 1, out.size());
 
@@ -823,7 +839,6 @@ public class MqttCodecTest {
 
     private static MqttSubAckMessage createSubAckMessage() {
         return createSubAckMessage(MqttProperties.NO_PROPERTIES);
-
     }
 
     private static MqttSubAckMessage createSubAckMessage(MqttProperties properties) {
@@ -855,7 +870,6 @@ public class MqttCodecTest {
                 .properties(properties)
                 .build();
     }
-
 
     // Helper methods to compare expected and actual
     // MQTT messages
@@ -1014,7 +1028,6 @@ public class MqttCodecTest {
         validateProperties(expectedProps, actualProps);
     }
 
-
     private static void validateProperties(MqttProperties expected, MqttProperties actual) {
         for (MqttProperties.MqttProperty expectedProperty : expected.listAll()) {
             MqttProperties.MqttProperty actualProperty = actual.getProperty(expectedProperty.propertyId);
@@ -1027,8 +1040,7 @@ public class MqttCodecTest {
                 case RETAIN_AVAILABLE:
                 case WILDCARD_SUBSCRIPTION_AVAILABLE:
                 case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
-                case SHARED_SUBSCRIPTION_AVAILABLE:
-                {
+                case SHARED_SUBSCRIPTION_AVAILABLE: {
                     final Integer expectedValue = ((MqttProperties.IntegerProperty) expectedProperty).value;
                     final Integer actualValue = ((MqttProperties.IntegerProperty) actualProperty).value;
                     assertEquals("one byte property doesn't match", expectedValue, actualValue);
@@ -1038,8 +1050,7 @@ public class MqttCodecTest {
                 case SERVER_KEEP_ALIVE:
                 case RECEIVE_MAXIMUM:
                 case TOPIC_ALIAS_MAXIMUM:
-                case TOPIC_ALIAS:
-                {
+                case TOPIC_ALIAS: {
                     final Integer expectedValue = ((MqttProperties.IntegerProperty) expectedProperty).value;
                     final Integer actualValue = ((MqttProperties.IntegerProperty) actualProperty).value;
                     assertEquals("two byte property doesn't match", expectedValue, actualValue);
@@ -1049,16 +1060,14 @@ public class MqttCodecTest {
                 case PUBLICATION_EXPIRY_INTERVAL:
                 case SESSION_EXPIRY_INTERVAL:
                 case WILL_DELAY_INTERVAL:
-                case MAXIMUM_PACKET_SIZE:
-                {
+                case MAXIMUM_PACKET_SIZE: {
                     final Integer expectedValue = ((MqttProperties.IntegerProperty) expectedProperty).value;
                     final Integer actualValue = ((MqttProperties.IntegerProperty) actualProperty).value;
                     assertEquals("four byte property doesn't match", expectedValue, actualValue);
                     break;
                 }
                 // four byte value integer property
-                case SUBSCRIPTION_IDENTIFIER:
-                {
+                case SUBSCRIPTION_IDENTIFIER: {
                     final Integer expectedValue = ((MqttProperties.IntegerProperty) expectedProperty).value;
                     final Integer actualValue = ((MqttProperties.IntegerProperty) actualProperty).value;
                     assertEquals("variable byte integer property doesn't match", expectedValue, actualValue);
@@ -1071,21 +1080,27 @@ public class MqttCodecTest {
                 case AUTHENTICATION_METHOD:
                 case RESPONSE_INFORMATION:
                 case SERVER_REFERENCE:
-                case REASON_STRING:
-                case USER_PROPERTY:
-                {
-                    final String expectedKey = ((MqttProperties.StringPairProperty) expectedProperty).key;
-                    final String expectedValue = ((MqttProperties.StringPairProperty) expectedProperty).value;
-                    final String actualKey = ((MqttProperties.StringPairProperty) actualProperty).key;
-                    final String actualValue = ((MqttProperties.StringPairProperty) actualProperty).value;
-                    assertEquals("StringPair.key property doesn't match", expectedKey, actualKey);
-                    assertEquals("StringPair.value property doesn't match", expectedValue, actualValue);
+                case REASON_STRING: {
+                    final String expectedValue = ((MqttProperties.StringProperty) expectedProperty).value;
+                    final String actualValue = ((MqttProperties.StringProperty) actualProperty).value;
+                    assertEquals("String property doesn't match", expectedValue, actualValue);
+                    break;
+                }
+                // User property
+                case USER_PROPERTY: {
+                    final List<MqttProperties.StringPair> expectedPairs =
+                            ((MqttProperties.UserProperties) expectedProperty).value;
+                    final List<MqttProperties.StringPair> actualPairs =
+                            ((MqttProperties.UserProperties) actualProperty).value;
+                    assertEquals("User properties count doesn't match", expectedPairs, actualPairs);
+                    for (int i = 0; i < expectedPairs.size(); i++) {
+                        assertEquals("User property mismatch", expectedPairs.get(i), actualPairs.get(i));
+                    }
                     break;
                 }
                 // byte[] property
                 case CORRELATION_DATA:
-                case AUTHENTICATION_DATA:
-                {
+                case AUTHENTICATION_DATA: {
                     final byte[] expectedValue = ((MqttProperties.BinaryProperty) expectedProperty).value;
                     final byte[] actualValue = ((MqttProperties.BinaryProperty) actualProperty).value;
                     final String expectedHexDump = ByteBufUtil.hexDump(expectedValue);

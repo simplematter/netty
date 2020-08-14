@@ -232,7 +232,6 @@ public final class MqttMessageBuilders {
             return this;
         }
 
-
         public SubscribeBuilder messageId(int messageId) {
             this.messageId = messageId;
             return this;
@@ -257,7 +256,6 @@ public final class MqttMessageBuilders {
                 subscriptions = new ArrayList<MqttTopicSubscription>(5);
             }
         }
-
     }
 
     public static final class UnsubscribeBuilder {

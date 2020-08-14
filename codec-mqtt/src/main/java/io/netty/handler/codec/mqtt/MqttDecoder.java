@@ -730,14 +730,16 @@ public final class MqttDecoder extends ReplayingDecoder<DecoderState> {
                 case 0x1A: // Response Information
                 case 0x1C: // Server Reference
                 case 0x1F: // Reason String
+                    final Result<String> stringResult = decodeString(buffer);
+                    numberOfBytesConsumed += stringResult.numberOfBytesConsumed;
+                    decodedProperties.add(new MqttProperties.StringProperty(propertyId.value, stringResult.value));
+                    break;
                 case 0x26: // User Property
                     final Result<String> keyResult = decodeString(buffer);
                     final Result<String> valueResult = decodeString(buffer);
                     numberOfBytesConsumed += keyResult.numberOfBytesConsumed;
                     numberOfBytesConsumed += valueResult.numberOfBytesConsumed;
-                    decodedProperties.add(new MqttProperties.StringPairProperty(propertyId.value,
-                            keyResult.value,
-                            valueResult.value));
+                    decodedProperties.add(new MqttProperties.UserProperty(keyResult.value, valueResult.value));
                     break;
                 case 0x09: // Correlation Data => Binary Data
                 case 0x16: // Authentication Data
